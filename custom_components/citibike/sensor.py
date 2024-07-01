@@ -49,7 +49,7 @@ class CitibikeSensor(Entity):
         """
         self._id = station_id
         self._data = data
-        self._state = None
+        self._state = 0
         self._name = None
 
         self._latitude = None
@@ -77,8 +77,25 @@ class CitibikeSensor(Entity):
     def state(self):
         """ Returns the state of the sensor.
         """
-        return self._state
+        return self._num_bikes_available
 
+    @property
+    def unique_id(self):
+        """ Returns the unique id of the sensor.
+        """
+        return self._name
+
+    @property
+    def device_class(self):
+        """ Returns the numeric class of the sensor.
+        """
+        return None
+
+    @property
+    def unit_of_measurement(self):
+        """ Returns the unit of the sensor.
+        """
+        return "bikes"
 
     @property
     def icon(self):
@@ -96,7 +113,6 @@ class CitibikeSensor(Entity):
         attrs["latitude"] = self._latitude
         attrs["longitude"] = self._longitude
         attrs["station_capacity"] = self._capacity
-        attrs["region"] = self._region
         attrs["last_reported"] = self._last_reported
         attrs["docs_available"] = self._docks_available
         attrs["is_renting"] = self._is_renting
