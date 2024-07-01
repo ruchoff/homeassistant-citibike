@@ -58,7 +58,7 @@ class CitibikeSensor(Entity):
         self._region = None
 
         self._last_reported = None
-        self._docks_abvailable = 0
+        self._docks_available = 0
         self._is_renting = False
         self._is_returning = False
         self._num_bikes_available = 0
@@ -87,7 +87,7 @@ class CitibikeSensor(Entity):
         return "mdi:bicycle"
 
     @property
-    def extra_state_attributes (self):
+    def extra_state_attributes(self):
         """ Returns the attributes of the sensor.
         """
         attrs = {}
@@ -98,10 +98,10 @@ class CitibikeSensor(Entity):
         attrs["station_capacity"] = self._capacity
         attrs["region"] = self._region
         attrs["last_reported"] = self._last_reported
-        attrs["docs_available"] = self._docks_abvailable
+        attrs["docs_available"] = self._docks_available
         attrs["is_renting"] = self._is_renting
         attrs["is_returning"] = self._is_returning
-        attrs["num_bikes_available"] = self._num_bikes_available + self._num_ebikes_available
+        attrs["num_bikes_available"] = self._num_bikes_available
         attrs["available_bike_types"] = (
             {"Human Powered": self._num_bikes_available - self._num_ebikes_available, "Electric Powered": self._num_ebikes_available}
         )
@@ -117,7 +117,7 @@ class CitibikeSensor(Entity):
         self._data.update()
         for station in self._data.station_info_data['data']['stations']:
             if station['station_id'] == self._id:
-                self._name = station['name']
+                self._name = "citibike_station_" + station['name']
                 self._latitude = station['lat']
                 self._longitude = station['lon']
                 self._capacity = station['capacity']
@@ -126,16 +126,15 @@ class CitibikeSensor(Entity):
         for station in self._data.station_status_data['data']['stations']:
             if station['station_id'] == self._id:
                 self._last_reported = datetime.fromtimestamp(station['last_reported'])
-                self._docks_abvailable = station['num_docks_available']
+                self._docks_available = station['num_docks_available']
                 self._is_renting = bool(station['is_renting'])
                 self._is_returning = bool(station['is_returning'])
                 self._num_bikes_available = station['num_bikes_available']
                 self._num_ebikes_available = station['num_ebikes_available']
                 self._num_bikes_disabled = station['num_bikes_disabled']
                 self._num_docks_disabled = station['num_docks_disabled']
-                self._num_bikes_disabled = station['num_bikes_disabled']
 
-                self._state = station['num_bikes_available'] + station['num_ebikes_available']
+                self._state = station['num_bikes_available']
 
 class GBFSServiceData(object):
     """ Query GBFS API.
