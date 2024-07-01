@@ -1,0 +1,6 @@
+{
+	"name": "CitiBike",
+	"domains": ["sensor"],
+	"country": ["US"],
+	"render_readme": true
+  }
