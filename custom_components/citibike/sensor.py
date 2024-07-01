@@ -115,7 +115,7 @@ class CitibikeSensor(Entity):
         """ Updates the sensor.
         """
         self._data.update()
-        for station in self._data.station_info_response['data']['stations']:
+        for station in self._data.station_info_data['data']['stations']:
             if station['station_id'] == self._id:
                 self._name = station['name']
                 self._latitude = station['lat']
@@ -123,7 +123,7 @@ class CitibikeSensor(Entity):
                 self._capacity = station['capacity']
                 self._region = station['region_id']
 
-        for station in self._data.station_status_response['data']['stations']:
+        for station in self._data.station_status_data['data']['stations']:
             if station['station_id'] == self._id:
                 self._last_reported = datetime.fromtimestamp(station['last_reported'])
                 self._docks_abvailable = station['num_docks_available']
