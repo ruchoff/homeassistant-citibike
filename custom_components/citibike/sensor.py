@@ -10,15 +10,12 @@ import requests
 import voluptuous as vol
 from homeassistant.components.sensor import PLATFORM_SCHEMA
 from homeassistant.helpers.entity import Entity
-from homeassistant.util import Throttle
 from homeassistant import core, config_entries
 
 from .const import (
-    DOMAIN,
     CONF_STATIONS,
     CONF_STATIONID,
     CONF_STATIONNAME,
-    CONF_REFRESHINT,
     STATION_INFO_URL,
     STATION_STATUS_URL,
 )
@@ -43,7 +40,6 @@ def setup_platform(
     discovery_info=None,
 ):
     """Set up the Citibike sensors."""
-    # SCAN_INTERVAL = timedelta(minutes=config.get(CONF_REFRESHINT, DEFAULT_REFRESHINT))
     data = GBFSServiceData()
     data.update()
     sensors = [CitibikeSensor(station, data) for station in config.get(CONF_STATIONS)]
