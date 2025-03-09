@@ -35,14 +35,23 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_SENSORNAME: user_input.get(CONF_SENSORNAME, ""),
             }
 
-            await self.async_set_unique_id(user_input[CONF_SENSORNAME].lower())
+            # Check if the station ID is already configured
+            existing_entries = self._async_current_entries()
+            for entry in existing_entries:
+                if entry.data.get(CONF_STATIONID) == user_input[CONF_STATIONID]:
+                    errors["base"] = "already_configured"
+                    break
+
+            # Set unique ID for the sensor name
+            await self.async_set_unique_id(user_input[CONF_STATIONID].lower())
             self._abort_if_unique_id_configured()
 
-            if not (errors := await self._async_try_connect()):
-                return self.async_create_entry(
-                    title=user_input[CONF_SENSORNAME] or user_input[CONF_STATIONID],
-                    data=self._config,
-                )
+            if not errors:
+                if not (errors := await self._async_try_connect()):
+                    return self.async_create_entry(
+                        title=user_input[CONF_SENSORNAME] or user_input[CONF_STATIONID],
+                        data=self._config,
+                    )
 
         user_input = user_input or {}
         return self.async_show_form(
