@@ -32,6 +32,12 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     }
 )
 
+async def async_setup_entry(hass: core.HomeAssistant, entry: config_entries.ConfigEntry, async_add_entities):
+    """Set up the Citibike sensors from a config entry."""
+    data = GBFSServiceData()
+    await hass.async_add_executor_job(data.update)
+    sensors = [CitibikeSensor(station, data) for station in entry.data[CONF_STATIONS]]
+    async_add_entities(sensors, True)
 
 def setup_platform(
     hass: core.HomeAssistant,
@@ -45,18 +51,17 @@ def setup_platform(
     sensors = [CitibikeSensor(station, data) for station in config.get(CONF_STATIONS)]
     add_devices(sensors, True)
 
-
 class CitibikeSensor(Entity):
     """Sensor that reads the status for an Citibike station."""
 
     def __init__(self, inStation, data):
         """Initalize the sensor."""
-        self._id = inStation["id"]
+        self._id = inStation["Station ID"]
         self._internal_id = None
         self._data = data
         self._state = 0
         if "name" in inStation:
-            self._name = inStation["name"]
+            self._name = inStation["Station Name"]
         else:
             self._name = None
 
@@ -152,7 +157,6 @@ class CitibikeSensor(Entity):
                 self._num_docks_disabled = station["num_docks_disabled"]
 
                 self._state = station["num_bikes_available"]
-
 
 class GBFSServiceData(object):
     """Query GBFS API."""
