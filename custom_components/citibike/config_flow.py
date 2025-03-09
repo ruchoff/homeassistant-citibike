@@ -91,39 +91,3 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return {CONF_STATIONID: "invalid_station_id"}
 
         return {}
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
-        """Get the options flow for this handler."""
-        return CitibikeOptionsFlowHandler(config_entry)
-
-
-class CitibikeOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle Citibike options."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize Citibike options flow."""
-        self.config_entry = config_entry
-
-    async def async_step_init(self, user_input: dict | None = None) -> dict:
-        """Manage the options."""
-        if user_input:
-            return self.async_create_entry(title="", data=user_input)
-
-        options_schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_STATIONID,
-                    default=self.config_entry.options.get(CONF_STATIONID, ""),
-                ): str,
-                vol.Optional(
-                    CONF_SENSORNAME,
-                    default=self.config_entry.options.get(CONF_SENSORNAME, ""),
-                ): str,
-            }
-        )
-
-        return self.async_show_form(step_id="init", data_schema=options_schema)
