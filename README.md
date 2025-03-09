@@ -55,20 +55,17 @@ _or_
 Copy `citibike` folder to your `custom_components` folder in your Home Assistant configuration directory.
 
 ### Configuration ###
-In your `configuration.yaml` file, add the following sensor:
 
-```yaml
-sensor:
-  - platform: citibike
-    stations:
-      - id: "6432.11"
-        name: "E 40 St & Park Ave"
-```
-`stations` accepts a list of one or many Citibike stations you want to track.
-- `id` is a required field, and is the Site ID of the Citibike station you want to track. Getting the id is available on [Citibike's website][citibike-explore]. On the map, select the station and you will see `Site ID` at the bottom of the info card.
+The CitiBike Station Status Sensor is set up via the UI. The setup asks for the below fields
 
-- `name` is optional. If omitted, sensor name will default to station's official name as provided in the API, with `citibike_station_` as the prefix.
+- `Station ID`: This is a required field and refers to the Site ID of the CitiBike station you wish to monitor. You can find the ID on [CitiBike's website][citibike-explore]. To obtain it, select a station on the map, and the Site ID will appear at the bottom of the information card.
 
+- `Sensor Name`: This is an optional field that defines the name of the sensor. If left blank, the sensor will default to the station's official name as provided in the API, with citibike_station_ as the prefix.
+
+| **Station ID** | **Station Name** | **Generated Sensor Name** |
+|----------------|------------------|---------------------------|
+| `6432.11`      | `Null`           | `sensor.citibike_station_6432_11_e_40_st_park_ave` |
+| `6432.11`      | `My Station`     | `sensor.my_station` |
 
 <!-- Badges -->
 [hacs-badge]: https://img.shields.io/badge/HACS-Default-41BDF5.svg

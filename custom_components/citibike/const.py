@@ -1,8 +1,7 @@
 DOMAIN = "citibike"
 
-CONF_STATIONS = "stations"
 CONF_STATIONID = "id"
-CONF_STATIONNAME = "name"
+CONF_SENSORNAME = "name"
 
 
 STATION_INFO_URL = "https://gbfs.lyft.com/gbfs/2.3/bkn/en/station_information.json"
