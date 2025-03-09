@@ -2,11 +2,11 @@
     "domain": "citibike",
     "name": "Citi Bike",
     "codeowners": ["@ruchoff"],
+    "config_flow": true
     "dependencies": [],
     "documentation": "https://github.com/ruchoff/homeassistant-citibike",
     "iot_class": "cloud_polling",
     "issue_tracker": "https://github.com/ruchoff/homeassistant-citibike/issues",
     "requirements": [],
-    "version": "v0.1.1",
-    "config_flow": true
+    "version": "v0.1.1"
 }
