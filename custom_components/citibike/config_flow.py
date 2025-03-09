@@ -35,14 +35,23 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_SENSORNAME: user_input.get(CONF_SENSORNAME, ""),
             }
 
-            await self.async_set_unique_id(user_input[CONF_SENSORNAME].lower())
+            # Check if the station ID is already configured
+            existing_entries = self._async_current_entries()
+            for entry in existing_entries:
+                if entry.data.get(CONF_STATIONID) == user_input[CONF_STATIONID]:
+                    errors["base"] = "already_configured"
+                    break
+
+            # Set unique ID for the sensor name
+            await self.async_set_unique_id(user_input[CONF_STATIONID].lower())
             self._abort_if_unique_id_configured()
 
-            if not (errors := await self._async_try_connect()):
-                return self.async_create_entry(
-                    title=user_input[CONF_SENSORNAME] or user_input[CONF_STATIONID],
-                    data=self._config,
-                )
+            if not errors:
+                if not (errors := await self._async_try_connect()):
+                    return self.async_create_entry(
+                        title=user_input[CONF_SENSORNAME] or user_input[CONF_STATIONID],
+                        data=self._config,
+                    )
 
         user_input = user_input or {}
         return self.async_show_form(
@@ -82,39 +91,3 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     return {CONF_STATIONID: "invalid_station_id"}
 
         return {}
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
-        """Get the options flow for this handler."""
-        return CitibikeOptionsFlowHandler(config_entry)
-
-
-class CitibikeOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle Citibike options."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize Citibike options flow."""
-        self.config_entry = config_entry
-
-    async def async_step_init(self, user_input: dict | None = None) -> dict:
-        """Manage the options."""
-        if user_input:
-            return self.async_create_entry(title="", data=user_input)
-
-        options_schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_STATIONID,
-                    default=self.config_entry.options.get(CONF_STATIONID, ""),
-                ): str,
-                vol.Optional(
-                    CONF_SENSORNAME,
-                    default=self.config_entry.options.get(CONF_SENSORNAME, ""),
-                ): str,
-            }
-        )
-
-        return self.async_show_form(step_id="init", data_schema=options_schema)
