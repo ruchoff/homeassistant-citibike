@@ -9,7 +9,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 import aiohttp
 
-from .const import DOMAIN, CONF_STATIONID, CONF_STATIONNAME, STATION_INFO_URL
+from .const import DOMAIN, CONF_STATIONID, CONF_SENSORNAME, STATION_INFO_URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,15 +32,15 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._config = {
                 CONF_STATIONID: user_input[CONF_STATIONID],
-                CONF_STATIONNAME: user_input.get(CONF_STATIONNAME, ""),
+                CONF_SENSORNAME: user_input.get(CONF_SENSORNAME, ""),
             }
 
-            await self.async_set_unique_id(user_input[CONF_STATIONID].lower())
+            await self.async_set_unique_id(user_input[CONF_SENSORNAME].lower())
             self._abort_if_unique_id_configured()
 
             if not (errors := await self._async_try_connect()):
                 return self.async_create_entry(
-                    title=user_input[CONF_STATIONNAME] or user_input[CONF_STATIONID],
+                    title=user_input[CONF_SENSORNAME] or user_input[CONF_STATIONID],
                     data=self._config,
                 )
 
@@ -53,7 +53,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_STATIONID, default=user_input.get(CONF_STATIONID, "")
                     ): str,
                     vol.Optional(
-                        CONF_STATIONNAME, default=user_input.get(CONF_STATIONNAME, "")
+                        CONF_SENSORNAME, default=user_input.get(CONF_SENSORNAME, "")
                     ): str,
                 }
             ),
@@ -111,8 +111,8 @@ class CitibikeOptionsFlowHandler(config_entries.OptionsFlow):
                     default=self.config_entry.options.get(CONF_STATIONID, ""),
                 ): str,
                 vol.Optional(
-                    CONF_STATIONNAME,
-                    default=self.config_entry.options.get(CONF_STATIONNAME, ""),
+                    CONF_SENSORNAME,
+                    default=self.config_entry.options.get(CONF_SENSORNAME, ""),
                 ): str,
             }
         )

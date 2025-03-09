@@ -14,7 +14,7 @@ from homeassistant import core, config_entries
 
 from .const import (
     CONF_STATIONID,
-    CONF_STATIONNAME,
+    CONF_SENSORNAME,
     STATION_INFO_URL,
     STATION_STATUS_URL,
 )
@@ -25,7 +25,7 @@ SCAN_INTERVAL = timedelta(minutes=5)
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_STATIONID): cv.string,
-        vol.Optional(CONF_STATIONNAME): cv.string,
+        vol.Optional(CONF_SENSORNAME): cv.string,
     }
 )
 
@@ -62,7 +62,7 @@ class CitibikeSensor(Entity):
         self._internal_id = None
         self._data = data
         self._state = 0
-        self._name = config.get(CONF_STATIONNAME, f"citibike_station_{self._id}")
+        self._name = config.get(CONF_SENSORNAME, f"citibike_station_{self._id}")
 
         self._latitude = None
         self._longitude = None
