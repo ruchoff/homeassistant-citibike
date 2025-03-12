@@ -46,16 +46,14 @@ Each sensor will include the following attributes:
 | **station_name**            | The name or location of the station.                                                                       | `E 40 St & Park Ave`   |
 | **latitude**                | The latitude coordinate of the station.                                                                   | `40.748817`            |
 | **longitude**               | The longitude coordinate of the station.                                                                  | `-73.985428`           |
-| **station_capacity**        | The total number of docking spaces available at the station.                                               | `40`                   |
-| **last_reported**           | The timestamp when the station's data was last updated.                                                   | `2025-01-01T23:59:59` |
-| **docks_available**         | The number of available docking spaces at the station.                                                   | `10`                   |
-| **is_renting**              | Indicates whether the station is currently renting bikes (True/False).                                     | `True`                 |
-| **is_returning**            | Indicates whether the station is currently accepting bike returns (True/False).                           | `True`                 |
 | **total_rideables_available** | The total number of rideables (bikes and e-bikes) available for rent.                                     | `23`                   |
+| **station_capacity**        | The total number of docking spaces available at the station.                                               | `40`                   |
+| **docks_available**         | The number of available docking spaces at the station.                                                   | `10`                   |
 | **available_bike_types**    | The types of bikes available for rent (e.g., "Human Powered" and "Electric Powered").                     | `Human Powered: 7, Electric Powered: 16` |
-| **max_ebike_distance**      | The maximum distance that an e-bike can travel, based on the remaining battery life.                       | `35 miles`             |
+| **max_ebike_distance**      | The maximum distance that an e-bike at this station can travel, based on the remaining battery life.                       | `35 miles`             |
 | **ebike_status**            | The status of each available e-bike, including battery percentage and remaining distance.                 | `bike_id: ...0123, battery_percent: 99, distance_remaining: 35 miles` |
 | **is_offline**              | Indicates whether the station is offline (True/False).                                                     | `False`                |
+| **last_reported**           | The timestamp when the station's data was last updated.                                                   | `2025-01-01T23:59:59` |
 
 
 ## Acknowledgements
