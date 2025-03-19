@@ -4,7 +4,8 @@
 			"already_configured": "Station is already configured."
 		},
 		"error": {
-			"invalid_station_id": "Invalid station ID."
+			"invalid_station_id": "Invalid station ID.",
+			"cannot_connect": "Cannot connect to Citibike API."
 		},
 		"step": {
 			"user": {

@@ -29,13 +29,7 @@ This integration provides real-time data about NYC Citi Bike stations within Hom
 1. In Home Assistant, navigate to **Configuration** > **Devices & Services**.
 2. Click **Add Integration** and search for "CitiBike".
 3. Enter the **Station ID** for the CitiBike station you want to monitor. You can find this ID on [CitiBike's Explore page](https://citibikenyc.com/explore). Simply select a station on the map, and the Site ID will appear at the bottom of the information card.
-4. Optionally, provide a **Sensor Name** to customize the sensor entity name (if left blank, the default sensor name will be generated based on the station’s ID and name).
 
-### Example Sensor Names:
-| **Station ID** | **Station Name** | **Generated Sensor Name** |
-|----------------|------------------|---------------------------|
-| `6432.11`      | `Null`           | `sensor.citibike_station_6432_11_e_40_st_park_ave` |
-| `6432.11`      | `My Station`     | `sensor.my_station` |
 
 
 ## Sensor State and Attributes
@@ -49,21 +43,22 @@ Each sensor will include the following attributes:
 | **Attribute**              | **Description**                                                                                           | **Example**            |
 |----------------------------|-----------------------------------------------------------------------------------------------------------|------------------------|
 | **station_id**              | The unique identifier for the station.                                                                     | `6432.11`              |
+| **station_name**            | The name or location of the station.                                                                       | `E 40 St & Park Ave`   |
 | **latitude**                | The latitude coordinate of the station.                                                                   | `40.748817`            |
 | **longitude**               | The longitude coordinate of the station.                                                                  | `-73.985428`           |
+| **total_rideables_available** | The total number of rideables (bikes and e-bikes) available for rent.                                     | `23`                   |
 | **station_capacity**        | The total number of docking spaces available at the station.                                               | `40`                   |
-| **last_reported**           | The timestamp when the station's data was last updated.                                                   | `2025-03-08 14:23:45` |
 | **docks_available**         | The number of available docking spaces at the station.                                                   | `10`                   |
-| **is_renting**              | Indicates whether the station is currently renting bikes (True/False).                                     | `True`                 |
-| **is_returning**            | Indicates whether the station is currently accepting bike returns (True/False).                           | `True`                 |
-| **num_bikes_available**     | The number of bikes currently available for rent.                                                        | `8`                    |
-| **available_bike_types**    | The types of bikes available for rent (e.g., "Human Powered" and "Electric Powered").                     | `Human Powered: 6, Electric Powered: 2` |
-| **num_bikes_disabled**      | The number of bikes that are currently out of service at the station.                                      | `2`                    |
-| **num_docks_disabled**      | The number of docking spaces that are currently unavailable at the station.                               | `1`                    |
+| **available_bike_types**    | The types of bikes available for rent (e.g., "Human Powered" and "Electric Powered").                     | `Human Powered: 7, Electric Powered: 16` |
+| **max_ebike_distance**      | The maximum distance that an e-bike at this station can travel, based on the remaining battery life.                       | `35 miles`             |
+| **ebike_status**            | The status of each available e-bike, including battery percentage and remaining distance.                 | `bike_id: ...0123, battery_percent: 99, distance_remaining: 35 miles` |
+| **is_offline**              | Indicates whether the station is offline (True/False).                                                     | `False`                |
+| **last_reported**           | The timestamp when the station's data was last updated.                                                   | `2025-01-01T23:59:59` |
+
 
 ## Acknowledgements
 
-This integration uses data from the CitiBike system, which is provided via the [CitiBike GBFS Feed][citibike-gbfs]. Special thanks to Lyft Bikes and Scooters, LLC for providing this data to the public under their [Data License Agreement][citibike-data-license].
+This integration uses data from the CitiBike system, which is provided via the [CitiBike GraphQL Feed][citibike-gql]. Special thanks to Lyft Bikes and Scooters, LLC for providing this data to the public under their [Data License Agreement][citibike-data-license].
 
 **Important:** This integration is not affiliated with or endorsed by Bikeshare (Lyft Bikes and Scooters, LLC) or Citigroup, Inc., and the data is provided "as is" without warranties regarding its availability or accuracy.
 
@@ -78,7 +73,7 @@ This integration uses data from the CitiBike system, which is provided via the [
 <!-- URLs -->
 [citibike-data-license]: https://ride.citibikenyc.com/data-sharing-policy
 [citibike-explore]: https://citibikenyc.com/explore
-[citibike-gbfs]: https://citibikenyc.com/system-data
+[citibike-gql]: https://account.citibikenyc.com/bikesharefe-gql
 [hacs]: https://hacs.xyz
 [hacs-validation-url]: https://github.com/ruchoff/homeassistant-citibike/actions/workflows/validate.yml
 [hassfest-validation-url]: https://github.com/ruchoff/homeassistant-citibike/actions/workflows/hassfest.yml
