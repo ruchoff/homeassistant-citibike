@@ -6,6 +6,7 @@ GET_STATION_ID_QUERY = {
                 supply(input: $input) {
                     stations {
                         siteId
+                        stationName
                     }
                 }
             }
