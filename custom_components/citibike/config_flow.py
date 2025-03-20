@@ -6,8 +6,8 @@ from typing import Any
 import voluptuous as vol
 from haversine import haversine
 
-from config.custom_components.citibike.graphql_queries.get_station_id_query import (
-    GET_STATION_ID_QUERY,
+from config.custom_components.citibike.graphql_queries.get_init_station_query import (
+    GET_INIT_STATION_QUERY,
 )
 from config.custom_components.citibike.graphql_requests import fetch_graphql_data
 from homeassistant import config_entries
@@ -105,7 +105,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
-        data = await fetch_graphql_data(GET_STATION_ID_QUERY)
+        data = await fetch_graphql_data(GET_INIT_STATION_QUERY)
 
         if data.get("base") == "cannot_connect":
             return {"base": "cannot_connect"}
