@@ -7,6 +7,10 @@ GET_STATION_ID_QUERY = {
                     stations {
                         siteId
                         stationName
+                        location {
+                            lat
+                            lng
+                        }
                     }
                 }
             }

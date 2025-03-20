@@ -4,13 +4,14 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from haversine import haversine
 
 from config.custom_components.citibike.graphql_queries.get_station_id_query import (
     GET_STATION_ID_QUERY,
 )
 from config.custom_components.citibike.graphql_requests import fetch_graphql_data
 from homeassistant import config_entries
-from homeassistant.core import callback
+from homeassistant.core import callback, HomeAssistant
 
 from .const import CONF_STATIONID, DOMAIN
 
@@ -65,6 +66,21 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data_schema=vol.Schema({}),
                 errors=errors,
             )
+
+        # Get home zone coordinates
+        home_zone = self.hass.states.get("zone.home")
+        home_lat = home_zone.attributes["latitude"]
+        home_lon = home_zone.attributes["longitude"]
+
+        # Calculate distance to home zone and sort stations
+        for station in self._stations:
+            station_lat = station["location"]["lat"]
+            station_lon = station["location"]["lng"]
+            station["distance"] = haversine(
+                (home_lat, home_lon), (station_lat, station_lon)
+            )
+
+        self._stations.sort(key=lambda x: x["distance"])
 
         # Create a dropdown list of stations
         station_options = {
