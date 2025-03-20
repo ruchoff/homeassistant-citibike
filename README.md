@@ -28,7 +28,7 @@ This integration provides real-time data about NYC Citi Bike stations within Hom
 
 1. In Home Assistant, navigate to **Configuration** > **Devices & Services**.
 2. Click **Add Integration** and search for "CitiBike".
-3. Enter the **Station ID** for the CitiBike station you want to monitor. You can find this ID on [CitiBike's Explore page](https://citibikenyc.com/explore). Simply select a station on the map, and the Site ID will appear at the bottom of the information card.
+3. Select the **Station Name** for the CitiBike station you want to monitor. Stations are sorted by distance to your Home Zone.
 
 
 

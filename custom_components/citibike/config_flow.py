@@ -4,13 +4,14 @@ import logging
 from typing import Any
 
 import voluptuous as vol
+from haversine import haversine
 
-from config.custom_components.citibike.graphql_queries.get_station_id_query import (
-    GET_STATION_ID_QUERY,
+from config.custom_components.citibike.graphql_queries.get_init_station_query import (
+    GET_INIT_STATION_QUERY,
 )
 from config.custom_components.citibike.graphql_requests import fetch_graphql_data
 from homeassistant import config_entries
-from homeassistant.core import callback
+from homeassistant.core import callback, HomeAssistant
 
 from .const import CONF_STATIONID, DOMAIN
 
@@ -25,6 +26,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._config: dict = {}
+        self._stations: list[dict[str, str]] = []
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -49,20 +51,47 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             if not errors:
-                if not (errors := await self._async_try_connect()):
-                    return self.async_create_entry(
-                        title=user_input[CONF_STATIONID],
-                        data=self._config,
-                    )
+                return self.async_create_entry(
+                    title=user_input[CONF_STATIONID],
+                    data=self._config,
+                )
 
-        user_input = user_input or {}
+        # Fetch stations if not already fetched
+        if not self._stations:
+            errors = await self._async_fetch_stations()
+
+        if errors:
+            return self.async_show_form(
+                step_id="user",
+                data_schema=vol.Schema({}),
+                errors=errors,
+            )
+
+        # Get home zone coordinates
+        home_zone = self.hass.states.get("zone.home")
+        home_lat = home_zone.attributes["latitude"]
+        home_lon = home_zone.attributes["longitude"]
+
+        # Calculate distance to home zone and sort stations
+        for station in self._stations:
+            station_lat = station["location"]["lat"]
+            station_lon = station["location"]["lng"]
+            station["distance"] = haversine(
+                (home_lat, home_lon), (station_lat, station_lon)
+            )
+
+        self._stations.sort(key=lambda x: x["distance"])
+
+        # Create a dropdown list of stations
+        station_options = {
+            station["siteId"]: station["stationName"] for station in self._stations
+        }
+
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_STATIONID, default=user_input.get(CONF_STATIONID, "")
-                    ): str,
+                    vol.Required(CONF_STATIONID): vol.In(station_options),
                 }
             ),
             errors=errors,
@@ -74,28 +103,14 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Get the options flow for this handler."""
         return CitibikeOptionsFlowHandler(config_entry)
 
-    async def _async_try_connect(self) -> dict[str, str]:
-        """Try to connect to the Citibike GraphQL API and validate the station ID asynchronously."""
-
-        # Fetch data using the reusable GraphQL request function
-        data = await fetch_graphql_data(GET_STATION_ID_QUERY)
+    async def _async_fetch_stations(self) -> dict[str, str]:
+        """Fetch stations from the Citibike GraphQL API asynchronously."""
+        data = await fetch_graphql_data(GET_INIT_STATION_QUERY)
 
         if data.get("base") == "cannot_connect":
             return {"base": "cannot_connect"}
 
-        # Filter stations by siteId
-        station_id = self._config[CONF_STATIONID]
-        filtered_data = [
-            station
-            for station in data["data"]["supply"]["stations"]
-            if station["siteId"] == station_id
-        ]
-
-        # If no station with the given siteId, return an invalid station ID error
-        if not filtered_data:
-            _LOGGER.debug("Station ID %s not found in supply data", station_id)
-            return {CONF_STATIONID: "invalid_station_id"}
-
+        self._stations = data["data"]["supply"]["stations"]
         return {}
 
 

@@ -1,4 +1,4 @@
-GET_STATION_ID_QUERY = {
+GET_INIT_STATION_QUERY = {
     "operationName": "GetSupply",
     "variables": {"input": {"regionCode": "BKN", "rideablePageLimit": 1000}},
     "query": """
@@ -6,6 +6,11 @@ GET_STATION_ID_QUERY = {
                 supply(input: $input) {
                     stations {
                         siteId
+                        stationName
+                        location {
+                            lat
+                            lng
+                        }
                     }
                 }
             }
