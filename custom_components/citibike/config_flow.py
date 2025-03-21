@@ -1,17 +1,15 @@
 """Config flow for Citibike integration."""
 
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 import logging
-from typing import Any
+from typing import Any, ClassVar
 
-import voluptuous as vol
 from haversine import haversine
+import voluptuous as vol
 
-from .graphql_queries.get_init_station_query import (
-    GET_INIT_STATION_QUERY,
-)
-from .graphql_requests import fetch_graphql_data
 from homeassistant import config_entries
-from homeassistant.core import callback, HomeAssistant
+from homeassistant.core import callback
 
 from .const import (
     CONF_STATIONID,
@@ -20,14 +18,26 @@ from .const import (
     NetworkNames,
     NetworkRegion,
 )
+from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
+from .graphql_requests import fetch_graphql_data
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class StationCache:
+    """Class to hold station cache data."""
+
+    timestamp: datetime
+    stations: list[dict[str, Any]]
 
 
 class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Citibike."""
 
-    VERSION = 1
+    # Class level cache configuration
+    _stations_cache: ClassVar[dict[str, StationCache]] = {}
+    STATION_CACHE_TIMEOUT: ClassVar[timedelta] = timedelta(hours=6)
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -144,6 +154,18 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
         network = NetworkNames(self._config.get("network"))
+        current_time = datetime.now()
+
+        # Check if we have valid cached data
+        if (
+            network.name in self._stations_cache
+            and current_time - self._stations_cache[network.name].timestamp
+            < self.STATION_CACHE_TIMEOUT
+        ):
+            self._stations = self._stations_cache[network.name].stations
+            _LOGGER.debug("Using cached stations for network %s", network.name)
+            return {}
+
         region_code = NetworkRegion[network.name].value
 
         query = {
@@ -159,6 +181,16 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return {"base": "cannot_connect"}
 
         self._stations = data["data"]["supply"]["stations"]
+
+        # Update cache with current timestamp
+        self._stations_cache[network.name] = StationCache(
+            timestamp=current_time,
+            stations=self._stations,
+        )
+
+        _LOGGER.debug(
+            "Fetched %d stations for network %s", len(self._stations), network.name
+        )
         return {}
 
 
