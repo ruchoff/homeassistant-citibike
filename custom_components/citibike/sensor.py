@@ -14,7 +14,7 @@ from homeassistant.components.sensor import PLATFORM_SCHEMA as SENSOR_PLATFORM_S
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 
-from .const import CONF_STATIONID
+from .const import CONF_STATIONID, NetworkGraphQLEndpoints, NetworkNames, NetworkRegion
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(minutes=5)
@@ -58,10 +58,11 @@ class CitibikeSensor(Entity):
         self._data = data
         self._state = 0
 
-        station = data.station_data
-        station_name = f"citibike_station_{self._id}_{station['stationName']}"
+        network = NetworkNames(config["network"]).value
+        station_name = f"{network}_{self._id}"
         self._name = station_name
-        self._station_name = station["stationName"]
+        self._network = network
+        self._site_id = None
 
         self._latitude = None
         self._longitude = None
@@ -111,8 +112,9 @@ class CitibikeSensor(Entity):
     def extra_state_attributes(self) -> dict:
         """Return the attributes of the sensor."""
         return {
-            "station_id": self._id,
-            "station_name": self._station_name,
+            "station_id": self._site_id,
+            "station_name": self._id,
+            "network": self._network,
             "latitude": self._latitude,
             "longitude": self._longitude,
             "total_rideables_available": self._total_rideables_available,
@@ -132,6 +134,7 @@ class CitibikeSensor(Entity):
         """Update the sensor."""
         await self._data.update()
         station = self._data.station_data
+        self._site_id = station["siteId"]
         self._latitude = station["location"]["lat"]
         self._longitude = station["location"]["lng"]
         self._capacity = station["totalBikesAvailable"] + station["bikeDocksAvailable"]
@@ -176,19 +179,30 @@ class GQLServiceData:
 
     async def update(self) -> None:
         """Update data based on SCAN_INTERVAL."""
-        data = await fetch_graphql_data(GET_SUPPLY_QUERY)
+        network = NetworkNames(self._config.get("network"))
+        endpoint = NetworkGraphQLEndpoints[network.name].value
+        region_code = NetworkRegion[network.name].value
+
+        query = {
+            "query": GET_SUPPLY_QUERY,
+            "variables": {
+                "input": {"regionCode": region_code, "rideablePageLimit": 1000}
+            },
+        }
+
+        data = await fetch_graphql_data(endpoint, query)
 
         if data.get("base") == "cannot_connect":
             _LOGGER.warning("Cannot connect to the GQL API")
             return
 
         # Get the station data by siteId
-        station_id = self._config[CONF_STATIONID]
+        station_name = self._config[CONF_STATIONID]
         self.station_data = next(
             (
                 station
                 for station in data["data"]["supply"]["stations"]
-                if station["siteId"] == station_id
+                if station["stationName"] == station_name
             ),
             None,
         )

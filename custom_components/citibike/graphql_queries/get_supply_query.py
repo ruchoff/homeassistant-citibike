@@ -1,55 +1,33 @@
-GET_SUPPLY_QUERY = {
-    "operationName": "GetSupply",
-    "variables": {"input": {"regionCode": "BKN", "rideablePageLimit": 1000}},
-    "query": """
-        query GetSupply($input: SupplyInput) {
-            supply(input: $input) {
-                stations {
-                    stationId
-                    stationName
-                    location {
-                        lat
-                        lng
-                        __typename
-                    }
-                    bikesAvailable
-                    bikeDocksAvailable
-                    ebikesAvailable
-                    scootersAvailable
-                    totalBikesAvailable
-                    totalRideablesAvailable
-                    isOffline
-                    siteId
-                    ebikes {
-                        rideableName
-                        batteryStatus {
-                            distanceRemaining {
-                                value
-                                unit
-                                __typename
-                            }
-                            percent
-                            __typename
+"""GraphQL query for fetching Citibike supply data."""
+
+GET_SUPPLY_QUERY = """
+    query GetSupply($input: SupplyInput) {
+        supply(input: $input) {
+            stations {
+                stationName
+                location {
+                    lat
+                    lng
+                }
+                siteId
+                totalBikesAvailable
+                bikeDocksAvailable
+                lastUpdatedMs
+                bikesAvailable
+                ebikesAvailable
+                isOffline
+                totalRideablesAvailable
+                ebikes {
+                    rideableName
+                    batteryStatus {
+                        percent
+                        distanceRemaining {
+                            value
+                            unit
                         }
-                        __typename
                     }
-                    scooters {
-                        rideableName
-                        batteryStatus {
-                            distanceRemaining {
-                                value
-                                unit
-                                __typename
-                            }
-                            percent
-                            __typename
-                        }
-                        __typename
-                    }
-                    lastUpdatedMs
-                    __typename
                 }
             }
         }
-    """,
-}
+    }
+"""

@@ -6,12 +6,20 @@ from typing import Any
 import voluptuous as vol
 from haversine import haversine
 
-from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
+from .graphql_queries.get_init_station_query import (
+    GET_INIT_STATION_QUERY,
+)
 from .graphql_requests import fetch_graphql_data
 from homeassistant import config_entries
 from homeassistant.core import callback, HomeAssistant
 
-from .const import CONF_STATIONID, DOMAIN
+from .const import (
+    CONF_STATIONID,
+    DOMAIN,
+    NetworkGraphQLEndpoints,
+    NetworkNames,
+    NetworkRegion,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,12 +38,29 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Handle the initial step."""
+        if user_input is not None:
+            self._config["network"] = user_input["network"]
+            return await self.async_step_select_station()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("network"): vol.In(
+                        [network.value for network in NetworkNames]
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_select_station(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Handle the step to select a station."""
         errors = {}
 
         if user_input is not None:
-            self._config = {
-                CONF_STATIONID: user_input[CONF_STATIONID],
-            }
+            self._config[CONF_STATIONID] = user_input[CONF_STATIONID]
 
             # Check if the station ID is already configured
             existing_entries = self._async_current_entries()
@@ -45,12 +70,14 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     break
 
             # Set unique ID for the sensor name
-            await self.async_set_unique_id(user_input[CONF_STATIONID].lower())
+            await self.async_set_unique_id(
+                f"{self._config['network'].lower()}_{user_input[CONF_STATIONID].lower()}"
+            )
             self._abort_if_unique_id_configured()
 
             if not errors:
                 return self.async_create_entry(
-                    title=user_input[CONF_STATIONID],
+                    title=f"{self._config['network']} {user_input[CONF_STATIONID]}",
                     data=self._config,
                 )
 
@@ -60,7 +87,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if errors:
             return self.async_show_form(
-                step_id="user",
+                step_id="select_station",
                 data_schema=vol.Schema({}),
                 errors=errors,
             )
@@ -82,11 +109,11 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # Create a dropdown list of stations
         station_options = {
-            station["siteId"]: station["stationName"] for station in self._stations
+            station["stationName"]: station["stationName"] for station in self._stations
         }
 
         return self.async_show_form(
-            step_id="user",
+            step_id="select_station",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_STATIONID): vol.In(station_options),
@@ -103,7 +130,18 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
-        data = await fetch_graphql_data(GET_INIT_STATION_QUERY)
+        network = NetworkNames(self._config.get("network"))
+        endpoint = NetworkGraphQLEndpoints[network.name].value
+        region_code = NetworkRegion[network.name].value
+
+        query = {
+            "query": GET_INIT_STATION_QUERY,
+            "variables": {
+                "input": {"regionCode": region_code, "rideablePageLimit": 1000}
+            },
+        }
+
+        data = await fetch_graphql_data(endpoint, query)
 
         if data.get("base") == "cannot_connect":
             return {"base": "cannot_connect"}
