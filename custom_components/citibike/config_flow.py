@@ -37,9 +37,11 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Handle the initial step."""
+        """Handle the initial step to select a network."""
+        _LOGGER.debug("Starting user step to select a network")
         if user_input is not None:
             self._config["network"] = user_input["network"]
+            _LOGGER.debug("Network selected: %s", user_input["network"])
             return await self.async_step_select_station()
 
         return self.async_show_form(
@@ -56,17 +58,23 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_select_station(
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """Handle the step to select a station."""
+        """Handle the step to select a station within the selected network."""
+        _LOGGER.debug("Starting step to select a station")
         errors = {}
 
         if user_input is not None:
             self._config[CONF_STATIONID] = user_input[CONF_STATIONID]
+            _LOGGER.debug("Station selected: %s", user_input[CONF_STATIONID])
 
             # Check if the station ID is already configured
             existing_entries = self._async_current_entries()
             for entry in existing_entries:
                 if entry.data.get(CONF_STATIONID) == user_input[CONF_STATIONID]:
                     errors["base"] = "already_configured"
+                    _LOGGER.debug(
+                        "Station ID %s is already configured",
+                        user_input[CONF_STATIONID],
+                    )
                     break
 
             # Set unique ID for the sensor name
@@ -76,6 +84,11 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._abort_if_unique_id_configured()
 
             if not errors:
+                _LOGGER.debug(
+                    "Creating entry for network %s and station %s",
+                    self._config["network"],
+                    user_input[CONF_STATIONID],
+                )
                 return self.async_create_entry(
                     title=f"{self._config['network']} {user_input[CONF_STATIONID]}",
                     data=self._config,

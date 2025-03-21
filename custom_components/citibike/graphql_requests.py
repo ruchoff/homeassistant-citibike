@@ -13,7 +13,9 @@ DEFAULT_HEADERS = {"Content-Type": "application/json"}
 
 
 async def fetch_graphql_data(
-    endpoint: NetworkGraphQLEndpoints, query: dict[str, Any], headers: dict[str, str] | None = None
+    endpoint: NetworkGraphQLEndpoints,
+    query: dict[str, Any],
+    headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Fetch data from the GraphQL API and clean it."""
     # Use default headers if no headers are passed
@@ -22,7 +24,9 @@ async def fetch_graphql_data(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(endpoint.value, json=query, headers=headers) as response:
+            async with session.post(
+                endpoint.value, json=query, headers=headers
+            ) as response:
                 if response.status != 200:
                     _LOGGER.error(
                         "Failed to connect: %s, %s",
@@ -30,9 +34,8 @@ async def fetch_graphql_data(
                         await response.text(),
                     )
                     return {"base": "cannot_connect"}
-
+                _LOGGER.debug("Successfully fetched data from GraphQL API")
                 data = await response.json()
-                _LOGGER.debug("Response data: %s", json.dumps(data, indent=2))
 
                 # Clean the data here
                 clean_data(data)

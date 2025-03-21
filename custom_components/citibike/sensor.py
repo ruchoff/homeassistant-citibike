@@ -5,9 +5,7 @@ import logging
 
 import voluptuous as vol
 
-from .graphql_queries.get_supply_query import (
-    GET_SUPPLY_QUERY,
-)
+from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
 from .graphql_requests import fetch_graphql_data
 from homeassistant import config_entries, core
 from homeassistant.components.sensor import PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA
@@ -30,6 +28,7 @@ async def async_setup_entry(
     hass: core.HomeAssistant, entry: config_entries.ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Citibike sensors from a config entry."""
+    _LOGGER.debug("Setting up Citibike sensor entry")
     data = GQLServiceData(entry.data)
     await data.update()
     sensor = CitibikeSensor(entry.data, data)
@@ -43,6 +42,7 @@ def setup_platform(
     discovery_info=None,
 ) -> None:
     """Set up the Citibike sensors."""
+    _LOGGER.debug("Setting up Citibike sensor platform")
     data = GQLServiceData(config)
     data.update()
     sensor = CitibikeSensor(config, data)
@@ -132,6 +132,7 @@ class CitibikeSensor(Entity):
 
     async def async_update(self) -> None:
         """Update the sensor."""
+        _LOGGER.debug("Updating Citibike sensor %s", self._id)
         await self._data.update()
         station = self._data.station_data
         self._site_id = station["siteId"]
@@ -173,7 +174,7 @@ class GQLServiceData:
     """Query GQL API for Citibike data."""
 
     def __init__(self, config: dict) -> None:
-        """Initialize the GBFSServiceData."""
+        """Initialize the GQL Service Data."""
         self._config = config
         self.station_data = None
 
@@ -188,7 +189,7 @@ class GQLServiceData:
                 "input": {"regionCode": region_code, "rideablePageLimit": 1000}
             },
         }
-
+        _LOGGER.debug("Fetching data for network %s", network.name)
         data = await fetch_graphql_data(NetworkGraphQLEndpoints[network.name], query)
 
         if data.get("base") == "cannot_connect":
@@ -205,3 +206,4 @@ class GQLServiceData:
             ),
             None,
         )
+        _LOGGER.debug("Fetched data for station %s", station_name)
