@@ -4,6 +4,8 @@ from typing import Any
 
 import aiohttp
 
+from .const import NetworkGraphQLEndpoints
+
 _LOGGER = logging.getLogger(__name__)
 
 # Default headers
@@ -11,7 +13,7 @@ DEFAULT_HEADERS = {"Content-Type": "application/json"}
 
 
 async def fetch_graphql_data(
-    endpoint: str, query: dict[str, Any], headers: dict[str, str] | None = None
+    endpoint: NetworkGraphQLEndpoints, query: dict[str, Any], headers: dict[str, str] | None = None
 ) -> dict[str, Any]:
     """Fetch data from the GraphQL API and clean it."""
     # Use default headers if no headers are passed
@@ -20,7 +22,7 @@ async def fetch_graphql_data(
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(endpoint, json=query, headers=headers) as response:
+            async with session.post(endpoint.value, json=query, headers=headers) as response:
                 if response.status != 200:
                     _LOGGER.error(
                         "Failed to connect: %s, %s",

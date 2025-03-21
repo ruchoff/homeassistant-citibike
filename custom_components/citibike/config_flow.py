@@ -131,7 +131,6 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
         network = NetworkNames(self._config.get("network"))
-        endpoint = NetworkGraphQLEndpoints[network.name].value
         region_code = NetworkRegion[network.name].value
 
         query = {
@@ -141,7 +140,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         }
 
-        data = await fetch_graphql_data(endpoint, query)
+        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network.name], query)
 
         if data.get("base") == "cannot_connect":
             return {"base": "cannot_connect"}

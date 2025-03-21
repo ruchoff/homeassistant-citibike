@@ -180,7 +180,6 @@ class GQLServiceData:
     async def update(self) -> None:
         """Update data based on SCAN_INTERVAL."""
         network = NetworkNames(self._config.get("network"))
-        endpoint = NetworkGraphQLEndpoints[network.name].value
         region_code = NetworkRegion[network.name].value
 
         query = {
@@ -190,7 +189,7 @@ class GQLServiceData:
             },
         }
 
-        data = await fetch_graphql_data(endpoint, query)
+        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network.name], query)
 
         if data.get("base") == "cannot_connect":
             _LOGGER.warning("Cannot connect to the GQL API")
