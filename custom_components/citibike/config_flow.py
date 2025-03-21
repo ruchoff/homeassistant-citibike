@@ -6,10 +6,8 @@ from typing import Any
 import voluptuous as vol
 from haversine import haversine
 
-from config.custom_components.citibike.graphql_queries.get_init_station_query import (
-    GET_INIT_STATION_QUERY,
-)
-from config.custom_components.citibike.graphql_requests import fetch_graphql_data
+from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
+from .graphql_requests import fetch_graphql_data
 from homeassistant import config_entries
 from homeassistant.core import callback, HomeAssistant
 

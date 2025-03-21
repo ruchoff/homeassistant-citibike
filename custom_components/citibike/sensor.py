@@ -5,10 +5,10 @@ import logging
 
 import voluptuous as vol
 
-from config.custom_components.citibike.graphql_queries.get_supply_query import (
+from .graphql_queries.get_supply_query import (
     GET_SUPPLY_QUERY,
 )
-from config.custom_components.citibike.graphql_requests import fetch_graphql_data
+from .graphql_requests import fetch_graphql_data
 from homeassistant import config_entries, core
 from homeassistant.components.sensor import PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA
 import homeassistant.helpers.config_validation as cv
