@@ -9,13 +9,20 @@
 		"step": {
 			"user": {
 				"data": {
+					"network": "Network Name"
+				},
+				"title": "Network Selection",
+				"description": "Select the bike share network of the station you want to configure."
+			},
+			"select_station": {
+				"data": {
 					"id": "Station Name"
 				},
 				"data_description": {
 					"id": "Sorted by distance to your home zone."
 				},
-				"title": "Configure Citibike",
-				"description": "Set up a new Citibike station."
+				"title": "Station selection",
+				"description": "Select the bike share station you want to track."
 			}
 		}
 	}

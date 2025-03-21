@@ -5,16 +5,14 @@ import logging
 
 import voluptuous as vol
 
-from .graphql_queries.get_supply_query import (
-    GET_SUPPLY_QUERY,
-)
+from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
 from .graphql_requests import fetch_graphql_data
 from homeassistant import config_entries, core
 from homeassistant.components.sensor import PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 
-from .const import CONF_STATIONID
+from .const import CONF_STATIONID, NetworkGraphQLEndpoints, NetworkNames, NetworkRegion
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(minutes=5)
@@ -30,6 +28,7 @@ async def async_setup_entry(
     hass: core.HomeAssistant, entry: config_entries.ConfigEntry, async_add_entities
 ) -> None:
     """Set up the Citibike sensors from a config entry."""
+    _LOGGER.debug("Setting up Citibike sensor entry")
     data = GQLServiceData(entry.data)
     await data.update()
     sensor = CitibikeSensor(entry.data, data)
@@ -43,6 +42,7 @@ def setup_platform(
     discovery_info=None,
 ) -> None:
     """Set up the Citibike sensors."""
+    _LOGGER.debug("Setting up Citibike sensor platform")
     data = GQLServiceData(config)
     data.update()
     sensor = CitibikeSensor(config, data)
@@ -58,10 +58,11 @@ class CitibikeSensor(Entity):
         self._data = data
         self._state = 0
 
-        station = data.station_data
-        station_name = f"citibike_station_{self._id}_{station['stationName']}"
+        network = NetworkNames(config["network"]).value
+        station_name = f"{network}_{self._id}"
         self._name = station_name
-        self._station_name = station["stationName"]
+        self._network = network
+        self._site_id = None
 
         self._latitude = None
         self._longitude = None
@@ -111,8 +112,9 @@ class CitibikeSensor(Entity):
     def extra_state_attributes(self) -> dict:
         """Return the attributes of the sensor."""
         return {
-            "station_id": self._id,
-            "station_name": self._station_name,
+            "station_id": self._site_id,
+            "station_name": self._id,
+            "network": self._network,
             "latitude": self._latitude,
             "longitude": self._longitude,
             "total_rideables_available": self._total_rideables_available,
@@ -130,8 +132,10 @@ class CitibikeSensor(Entity):
 
     async def async_update(self) -> None:
         """Update the sensor."""
+        _LOGGER.debug("Updating Citibike sensor %s", self._id)
         await self._data.update()
         station = self._data.station_data
+        self._site_id = station["siteId"]
         self._latitude = station["location"]["lat"]
         self._longitude = station["location"]["lng"]
         self._capacity = station["totalBikesAvailable"] + station["bikeDocksAvailable"]
@@ -170,25 +174,36 @@ class GQLServiceData:
     """Query GQL API for Citibike data."""
 
     def __init__(self, config: dict) -> None:
-        """Initialize the GBFSServiceData."""
+        """Initialize the GQL Service Data."""
         self._config = config
         self.station_data = None
 
     async def update(self) -> None:
         """Update data based on SCAN_INTERVAL."""
-        data = await fetch_graphql_data(GET_SUPPLY_QUERY)
+        network = NetworkNames(self._config.get("network"))
+        region_code = NetworkRegion[network.name].value
+
+        query = {
+            "query": GET_SUPPLY_QUERY,
+            "variables": {
+                "input": {"regionCode": region_code, "rideablePageLimit": 1000}
+            },
+        }
+        _LOGGER.debug("Fetching data for network %s", network.name)
+        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network.name], query)
 
         if data.get("base") == "cannot_connect":
             _LOGGER.warning("Cannot connect to the GQL API")
             return
 
         # Get the station data by siteId
-        station_id = self._config[CONF_STATIONID]
+        station_name = self._config[CONF_STATIONID]
         self.station_data = next(
             (
                 station
                 for station in data["data"]["supply"]["stations"]
-                if station["siteId"] == station_id
+                if station["stationName"] == station_name
             ),
             None,
         )
+        _LOGGER.debug("Fetched data for station %s", station_name)

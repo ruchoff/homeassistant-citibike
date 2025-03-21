@@ -1,18 +1,15 @@
-GET_INIT_STATION_QUERY = {
-    "operationName": "GetSupply",
-    "variables": {"input": {"regionCode": "BKN", "rideablePageLimit": 1000}},
-    "query": """
-            query GetSupply($input: SupplyInput) {
-                supply(input: $input) {
-                    stations {
-                        siteId
-                        stationName
-                        location {
-                            lat
-                            lng
-                        }
-                    }
+"""GraphQL query for initializing Citibike stations."""
+
+GET_INIT_STATION_QUERY = """
+    query GetSupply($input: SupplyInput) {
+        supply(input: $input) {
+            stations {
+                stationName
+                location {
+                    lat
+                    lng
                 }
             }
-        """,
-}
+        }
+    }
+"""

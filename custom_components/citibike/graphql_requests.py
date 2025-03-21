@@ -1,9 +1,10 @@
 import json
 import logging
+from typing import Any
 
 import aiohttp
 
-from .const import GQL_ENDPOINT
+from .const import NetworkGraphQLEndpoints
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -11,37 +12,41 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_HEADERS = {"Content-Type": "application/json"}
 
 
-async def fetch_graphql_data(query, headers=None):
+async def fetch_graphql_data(
+    endpoint: NetworkGraphQLEndpoints,
+    query: dict[str, Any],
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Fetch data from the GraphQL API and clean it."""
-
     # Use default headers if no headers are passed
     if headers is None:
         headers = DEFAULT_HEADERS
 
     try:
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(GQL_ENDPOINT, json=query, headers=headers) as response,
-        ):
-            if response.status != 200:
-                _LOGGER.error(
-                    "Failed to connect: %s, %s", response.status, await response.text()
-                )
-                return {"base": "cannot_connect"}
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                endpoint.value, json=query, headers=headers
+            ) as response:
+                if response.status != 200:
+                    _LOGGER.error(
+                        "Failed to connect: %s, %s",
+                        response.status,
+                        await response.text(),
+                    )
+                    return {"base": "cannot_connect"}
+                _LOGGER.debug("Successfully fetched data from GraphQL API")
+                data = await response.json()
 
-            data = await response.json()
-            _LOGGER.debug("Response data: %s", json.dumps(data, indent=2))
+                # Clean the data here
+                clean_data(data)
 
-            # Clean the data here
-            clean_data(data)
-
-            return data
+                return data
     except Exception as e:
         _LOGGER.error("Error during GraphQL request: %s", str(e))
         return {"base": "cannot_connect"}
 
 
-def clean_data(data):
+def clean_data(data: dict[str, Any]) -> None:
     """Clean the rideable names by replacing Unicode characters."""
     if "data" in data and "supply" in data["data"]:
         for station in data["data"]["supply"].get("stations", []):
