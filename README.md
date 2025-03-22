@@ -25,7 +25,7 @@ This integration provides real-time data about bike share stations across multip
 - Automatically updates data at regular intervals to provide real-time information
 - Choose from multiple bike share networks and view station details within the selected network
 - Station selection list is sorted by distance to your Home Zone for easy setup
-
+- Efficient network data caching to minimize API calls when monitoring multiple stations
 
 ## Installation
 ### HACS (Home Assistant Community Store)
