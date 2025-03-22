@@ -5,14 +5,15 @@ import logging
 
 import voluptuous as vol
 
-from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
-from .graphql_requests import fetch_graphql_data
 from homeassistant import config_entries, core
 from homeassistant.components.sensor import PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.entity import Entity
 
+from .cache import SensorDataCache
 from .const import CONF_STATIONID, NetworkGraphQLEndpoints, NetworkNames, NetworkRegion
+from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
+from .graphql_requests import fetch_graphql_data
 
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(minutes=5)
@@ -177,11 +178,19 @@ class GQLServiceData:
         """Initialize the GQL Service Data."""
         self._config = config
         self.station_data = None
+        self._network = NetworkNames(self._config.get("network"))
 
     async def update(self) -> None:
         """Update data based on SCAN_INTERVAL."""
-        network = NetworkNames(self._config.get("network"))
-        region_code = NetworkRegion[network.name].value
+        network_name = self._network.name
+
+        # Check sensor data cache
+        if cached_data := SensorDataCache.get_cached_data(network_name):
+            self._update_station_data(cached_data)
+            return
+
+        _LOGGER.debug("[API] Fetching data for network %s", network_name)
+        region_code = NetworkRegion[network_name].value
 
         query = {
             "query": GET_SUPPLY_QUERY,
@@ -189,21 +198,28 @@ class GQLServiceData:
                 "input": {"regionCode": region_code, "rideablePageLimit": 1000}
             },
         }
-        _LOGGER.debug("Fetching data for network %s", network.name)
-        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network.name], query)
+
+        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network_name], query)
 
         if data.get("base") == "cannot_connect":
-            _LOGGER.warning("Cannot connect to the GQL API")
+            _LOGGER.warning("[API] Connection failed for network %s", network_name)
             return
 
-        # Get the station data by siteId
+        stations = data["data"]["supply"]["stations"]
+        SensorDataCache.update_cache(network_name, stations)
+        self._update_station_data(stations)
+
+    def _update_station_data(self, stations: list[dict[str, any]]) -> None:
+        """Update station data from stations list."""
         station_name = self._config[CONF_STATIONID]
-        self.station_data = next(
-            (
-                station
-                for station in data["data"]["supply"]["stations"]
-                if station["stationName"] == station_name
-            ),
+        if station := next(
+            (s for s in stations if s["stationName"] == station_name),
             None,
-        )
-        _LOGGER.debug("Fetched data for station %s", station_name)
+        ):
+            self.station_data = station
+            _LOGGER.debug(
+                "[Station] Updated %s - Bikes: %d, E-bikes: %d",
+                station_name,
+                station["bikesAvailable"],
+                station["ebikesAvailable"],
+            )

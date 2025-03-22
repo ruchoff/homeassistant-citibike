@@ -1,9 +1,8 @@
 """Config flow for Citibike integration."""
 
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from haversine import haversine
 import voluptuous as vol
@@ -11,6 +10,7 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 
+from .cache import StationCache
 from .const import (
     CONF_STATIONID,
     DOMAIN,
@@ -22,14 +22,6 @@ from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
 from .graphql_requests import fetch_graphql_data
 
 _LOGGER = logging.getLogger(__name__)
-
-
-@dataclass
-class StationCache:
-    """Class to hold station cache data."""
-
-    timestamp: datetime
-    stations: list[dict[str, Any]]
 
 
 class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -45,7 +37,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._stations: list[dict[str, str]] = []
 
     async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: dict[str, any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Handle the initial step to select a network."""
         _LOGGER.debug("Starting user step to select a network")
@@ -66,7 +58,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_select_station(
-        self, user_input: dict[str, Any] | None = None
+        self, user_input: dict[str, any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Handle the step to select a station within the selected network."""
         _LOGGER.debug("Starting step to select a station")
@@ -154,43 +146,35 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
         network = NetworkNames(self._config.get("network"))
-        current_time = datetime.now()
+        network_name = network.name
 
-        # Check if we have valid cached data
-        if (
-            network.name in self._stations_cache
-            and current_time - self._stations_cache[network.name].timestamp
-            < self.STATION_CACHE_TIMEOUT
-        ):
-            self._stations = self._stations_cache[network.name].stations
-            _LOGGER.debug("Using cached stations for network %s", network.name)
+        # Check station cache
+        if cached_data := StationCache.get_cached_data(network_name):
+            self._stations = cached_data
             return {}
 
-        region_code = NetworkRegion[network.name].value
+        _LOGGER.debug("[API] Fetching station list for network %s", network_name)
+        region_code = NetworkRegion[network_name].value
 
         query = {
             "query": GET_INIT_STATION_QUERY,
-            "variables": {
-                "input": {"regionCode": region_code, "rideablePageLimit": 1000}
-            },
+            "variables": {"input": {"regionCode": region_code}},
         }
 
-        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network.name], query)
+        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network_name], query)
 
         if data.get("base") == "cannot_connect":
+            _LOGGER.warning("[API] Connection failed for network %s", network_name)
             return {"base": "cannot_connect"}
 
         self._stations = data["data"]["supply"]["stations"]
-
-        # Update cache with current timestamp
-        self._stations_cache[network.name] = StationCache(
-            timestamp=current_time,
-            stations=self._stations,
-        )
-
+        StationCache.update_cache(network_name, self._stations)
         _LOGGER.debug(
-            "Fetched %d stations for network %s", len(self._stations), network.name
+            "[Config] Found %d stations for network %s",
+            len(self._stations),
+            network_name,
         )
+
         return {}
 
 
