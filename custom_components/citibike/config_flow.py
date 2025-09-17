@@ -154,21 +154,34 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return {}
 
         _LOGGER.debug("[API] Fetching station list for network %s", network_name)
-        region_code = NetworkRegion[network_name].value
 
-        query = {
-            "query": GET_INIT_STATION_QUERY,
-            "variables": {"input": {"regionCode": region_code}},
-        }
+        region_codes = NetworkRegion[network_name].value
+        all_stations: list[dict] = []
 
-        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network_name], query)
+        for region_code in region_codes:
+            query = {
+                "query": GET_INIT_STATION_QUERY,
+                "variables": {"input": {"regionCode": region_code}},
+            }
 
-        if data.get("base") == "cannot_connect":
-            _LOGGER.warning("[API] Connection failed for network %s", network_name)
-            return {"base": "cannot_connect"}
+            data = await fetch_graphql_data(
+                NetworkGraphQLEndpoints[network_name], query
+            )
 
-        self._stations = data["data"]["supply"]["stations"]
+            if data.get("base") == "cannot_connect":
+                _LOGGER.warning(
+                    "[API] Connection failed for network %s region %s",
+                    network_name,
+                    region_code,
+                )
+                continue
+
+            stations = data["data"]["supply"]["stations"]
+            all_stations.extend(stations)
+
+        self._stations = all_stations
         StationCache.update_cache(network_name, self._stations)
+
         _LOGGER.debug(
             "[Config] Found %d stations for network %s",
             len(self._stations),

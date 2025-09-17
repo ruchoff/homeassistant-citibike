@@ -26,9 +26,9 @@ class NetworkGraphQLEndpoints(Enum):
 
 
 class NetworkRegion(Enum):
-    CITIBIKE = "BKN"
-    BAYWHEELS = "SFO"
-    DIVVY = "CHI"
-    COGO = "CMH"
-    CAPITALBIKESHARE = "DCA"
-    BIKETOWN = "PDX"
+    CITIBIKE = ["BKN"]
+    BAYWHEELS = ["SFO", "SJC"]
+    DIVVY = ["CHI"]
+    COGO = ["CMH"]
+    CAPITALBIKESHARE = ["DCA"]
+    BIKETOWN = ["PDX"]
