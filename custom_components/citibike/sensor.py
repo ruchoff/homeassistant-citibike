@@ -190,24 +190,39 @@ class GQLServiceData:
             return
 
         _LOGGER.debug("[API] Fetching data for network %s", network_name)
-        region_code = NetworkRegion[network_name].value
 
-        query = {
-            "query": GET_SUPPLY_QUERY,
-            "variables": {
-                "input": {"regionCode": region_code, "rideablePageLimit": 1000}
-            },
-        }
+        region_codes = NetworkRegion[network_name].value
+        all_stations: list[dict] = []
 
-        data = await fetch_graphql_data(NetworkGraphQLEndpoints[network_name], query)
+        for region_code in region_codes:
+            query = {
+                "query": GET_SUPPLY_QUERY,
+                "variables": {
+                    "input": {"regionCode": region_code, "rideablePageLimit": 1000}
+                },
+            }
 
-        if data.get("base") == "cannot_connect":
-            _LOGGER.warning("[API] Connection failed for network %s", network_name)
+            data = await fetch_graphql_data(
+                NetworkGraphQLEndpoints[network_name], query
+            )
+
+            if data.get("base") == "cannot_connect":
+                _LOGGER.warning(
+                    "[API] Connection failed for network %s region %s",
+                    network_name,
+                    region_code,
+                )
+                continue
+
+            stations = data["data"]["supply"]["stations"]
+            all_stations.extend(stations)
+
+        if not all_stations:
+            _LOGGER.warning("[API] No stations retrieved for network %s", network_name)
             return
 
-        stations = data["data"]["supply"]["stations"]
-        SensorDataCache.update_cache(network_name, stations)
-        self._update_station_data(stations)
+        SensorDataCache.update_cache(network_name, all_stations)
+        self._update_station_data(all_stations)
 
     def _update_station_data(self, stations: list[dict[str, any]]) -> None:
         """Update station data from stations list."""
