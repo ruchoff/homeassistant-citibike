@@ -1,13 +1,15 @@
 """Integration for Citibike sensors."""
 
-from datetime import datetime
 import logging
 from typing import Any
 
 from homeassistant import config_entries, core
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
-from .const import CONF_STATION_ID, CONF_STATION_NAME
+from .const import CONF_STATION_ID, CONF_STATION_NAME, DOMAIN
 from .coordinator import CitibikeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,16 +23,28 @@ async def async_setup_entry(
     async_add_entities([CitibikeSensor(entry.runtime_data, entry.data)])
 
 
-class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator]):
+class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator], SensorEntity):
     """Sensor that reads the status for a Citibike station."""
+
+    # The sensor is the station's main feature, so it takes the device name
+    _attr_has_entity_name = True
+    _attr_name = None
+    _attr_icon = "mdi:bicycle"
+    _attr_native_unit_of_measurement = "rideables"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: CitibikeCoordinator, config: dict) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._id = config[CONF_STATION_ID]
         self._network = coordinator.network.value
-        self._name = f"{self._network}_{config[CONF_STATION_NAME]}"
-        self._unique_id = f"{coordinator.network.name.lower()}_{self._id}"
+        self._attr_unique_id = f"{coordinator.network.name.lower()}_{self._id}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._attr_unique_id)},
+            name=f"{self._network} {config[CONF_STATION_NAME]}",
+            manufacturer=self._network,
+            entry_type=DeviceEntryType.SERVICE,
+        )
 
     @property
     def _station(self) -> dict[str, Any] | None:
@@ -43,36 +57,11 @@ class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator]):
         return super().available and self._station is not None
 
     @property
-    def name(self) -> str:
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self) -> int | None:
-        """Return the state of the sensor."""
+    def native_value(self) -> int | None:
+        """Return the number of rideables available at the station."""
         if (station := self._station) is None:
             return None
         return station["totalRideablesAvailable"]
-
-    @property
-    def unique_id(self) -> str:
-        """Return the unique ID of the sensor."""
-        return self._unique_id
-
-    @property
-    def device_class(self) -> str:
-        """Return the device class of the sensor."""
-        return None
-
-    @property
-    def unit_of_measurement(self) -> str:
-        """Return the unit of measurement of the sensor."""
-        return "rideables"
-
-    @property
-    def icon(self) -> str:
-        """Return the icon used for the frontend."""
-        return "mdi:bicycle"
 
     @property
     def extra_state_attributes(self) -> dict | None:
@@ -113,6 +102,8 @@ class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator]):
                 default=0,
             ),
             "ebike_status": ebike_status,
-            "last_reported": datetime.fromtimestamp(station["lastUpdatedMs"] / 1000),
+            "last_reported": dt_util.utc_from_timestamp(
+                station["lastUpdatedMs"] / 1000
+            ),
             "is_offline": station["isOffline"],
         }
