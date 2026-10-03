@@ -8,7 +8,6 @@ from haversine import haversine
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import callback
 
 from .cache import StationCache
 from .const import (
@@ -41,10 +40,15 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         """Handle the initial step to select a network."""
         _LOGGER.debug("Starting user step to select a network")
+        errors = {}
+
         if user_input is not None:
             self._config["network"] = user_input["network"]
             _LOGGER.debug("Network selected: %s", user_input["network"])
-            return await self.async_step_select_station()
+
+            errors = await self._async_fetch_stations()
+            if not errors:
+                return await self.async_step_select_station()
 
         return self.async_show_form(
             step_id="user",
@@ -55,6 +59,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     ),
                 }
             ),
+            errors=errors,
         )
 
     async def async_step_select_station(
@@ -62,22 +67,10 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         """Handle the step to select a station within the selected network."""
         _LOGGER.debug("Starting step to select a station")
-        errors = {}
 
         if user_input is not None:
             self._config[CONF_STATIONID] = user_input[CONF_STATIONID]
             _LOGGER.debug("Station selected: %s", user_input[CONF_STATIONID])
-
-            # Check if the station ID is already configured
-            existing_entries = self._async_current_entries()
-            for entry in existing_entries:
-                if entry.data.get(CONF_STATIONID) == user_input[CONF_STATIONID]:
-                    errors["base"] = "already_configured"
-                    _LOGGER.debug(
-                        "Station ID %s is already configured",
-                        user_input[CONF_STATIONID],
-                    )
-                    break
 
             # Set unique ID for the sensor name
             await self.async_set_unique_id(
@@ -85,40 +78,22 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
             self._abort_if_unique_id_configured()
 
-            if not errors:
-                _LOGGER.debug(
-                    "Creating entry for network %s and station %s",
-                    self._config["network"],
-                    user_input[CONF_STATIONID],
-                )
-                return self.async_create_entry(
-                    title=f"{self._config['network']} {user_input[CONF_STATIONID]}",
-                    data=self._config,
-                )
-
-        # Fetch stations if not already fetched
-        if not self._stations:
-            errors = await self._async_fetch_stations()
-
-        if errors:
-            return self.async_show_form(
-                step_id="select_station",
-                data_schema=vol.Schema({}),
-                errors=errors,
+            _LOGGER.debug(
+                "Creating entry for network %s and station %s",
+                self._config["network"],
+                user_input[CONF_STATIONID],
+            )
+            return self.async_create_entry(
+                title=f"{self._config['network']} {user_input[CONF_STATIONID]}",
+                data=self._config,
             )
 
-        # Get home zone coordinates
-        home_zone = self.hass.states.get("zone.home")
-        home_lat = home_zone.attributes["latitude"]
-        home_lon = home_zone.attributes["longitude"]
-
-        # Calculate distance to home zone and sort stations
+        # Calculate distance to home and sort stations
+        home = (self.hass.config.latitude, self.hass.config.longitude)
         for station in self._stations:
             station_lat = station["location"]["lat"]
             station_lon = station["location"]["lng"]
-            station["distance"] = haversine(
-                (home_lat, home_lon), (station_lat, station_lon)
-            )
+            station["distance"] = haversine(home, (station_lat, station_lon))
 
         self._stations.sort(key=lambda x: x["distance"])
 
@@ -134,14 +109,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_STATIONID): vol.In(station_options),
                 }
             ),
-            errors=errors,
         )
-
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry):
-        """Get the options flow for this handler."""
-        return CitibikeOptionsFlowHandler(config_entry)
 
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
@@ -168,16 +136,30 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 NetworkGraphQLEndpoints[network_name], query
             )
 
+            # Don't offer (or cache) a list that is missing a region
             if data.get("base") == "cannot_connect":
                 _LOGGER.warning(
                     "[API] Connection failed for network %s region %s",
                     network_name,
                     region_code,
                 )
-                continue
+                return {"base": "cannot_connect"}
 
-            stations = data["data"]["supply"]["stations"]
+            try:
+                stations = data["data"]["supply"]["stations"]
+            except (KeyError, TypeError):
+                _LOGGER.warning(
+                    "[API] Unexpected response for network %s region %s",
+                    network_name,
+                    region_code,
+                )
+                return {"base": "cannot_connect"}
+
             all_stations.extend(stations)
+
+        if not all_stations:
+            _LOGGER.warning("[API] No stations retrieved for network %s", network_name)
+            return {"base": "cannot_connect"}
 
         self._stations = all_stations
         StationCache.update_cache(network_name, self._stations)
@@ -189,18 +171,3 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         return {}
-
-
-class CitibikeOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle Citibike options."""
-
-    def __init__(self, config_entry) -> None:
-        """Initialize the options flow handler."""
-        self.config_entry = config_entry
-
-    async def async_step_init(self, user_input=None):
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(step_id="init")
