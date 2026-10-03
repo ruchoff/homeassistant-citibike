@@ -4,8 +4,6 @@ from unittest.mock import patch
 
 import pytest
 
-from custom_components.citibike.cache import StationCache
-
 
 def make_station(
     name: str, station_id: str, lat: float, lng: float, **overrides
@@ -59,14 +57,6 @@ def supply_response(stations: list[dict]) -> dict:
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable loading the integration under test."""
     return
-
-
-@pytest.fixture(autouse=True)
-def clear_station_cache():
-    """Keep the config flow station cache from leaking between tests."""
-    StationCache._cache.clear()
-    yield
-    StationCache._cache.clear()
 
 
 @pytest.fixture

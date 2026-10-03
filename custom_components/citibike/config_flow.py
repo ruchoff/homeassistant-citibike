@@ -13,7 +13,6 @@ from homeassistant.helpers.selector import (
 from homeassistant.util.location import distance
 import voluptuous as vol
 
-from .cache import StationCache
 from .const import (
     CONF_NETWORK,
     CONF_STATION_ID,
@@ -37,7 +36,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._config: dict = {}
-        self._stations: list[dict[str, str]] = []
+        self._stations: list[dict[str, Any]] = []
         self._station_choices: dict[str, dict[str, Any]] = {}
 
     async def async_step_user(
@@ -100,15 +99,17 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             errors[CONF_STATION_ID] = "invalid_station"
 
-        # Calculate distance to home and sort stations
+        # Sort stations by distance to home
         home_lat = self.hass.config.latitude
         home_lon = self.hass.config.longitude
-        for station in self._stations:
-            station_lat = station["location"]["lat"]
-            station_lon = station["location"]["lng"]
-            station["distance"] = distance(home_lat, home_lon, station_lat, station_lon)
-
-        self._stations.sort(key=lambda x: x["distance"])
+        self._stations.sort(
+            key=lambda station: distance(
+                home_lat,
+                home_lon,
+                station["location"]["lat"],
+                station["location"]["lng"],
+            )
+        )
 
         # Create a dropdown of station names in order of distance. The frontend
         # only offers type-to-search on a dropdown that accepts custom values,
@@ -158,9 +159,10 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         network = NETWORKS_BY_NAME[self._config[CONF_NETWORK]]
         network_name = network.name
 
-        # Check station cache
-        if cached_data := StationCache.get_cached_data(network.key):
-            self._stations = cached_data
+        # A network that is already set up has an up to date station list
+        coordinator = self.hass.data.get(DOMAIN, {}).get(network.key)
+        if coordinator is not None and coordinator.last_update_success:
+            self._stations = list(coordinator.data.values())
             return {}
 
         _LOGGER.debug("[API] Fetching station list for network %s", network_name)
@@ -175,7 +177,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "variables": {"input": {"regionCode": region_code}},
             }
 
-            # Don't offer (or cache) a list that is missing a region
+            # Don't offer a list that is missing a region
             try:
                 stations = await fetch_stations(session, network.endpoint, query)
             except GraphQLRequestError as err:
@@ -194,7 +196,6 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return {"base": "cannot_connect"}
 
         self._stations = all_stations
-        StationCache.update_cache(network.key, self._stations)
 
         _LOGGER.debug(
             "[Config] Found %d stations for network %s",

@@ -3,6 +3,7 @@
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.citibike.const import DOMAIN
 from custom_components.citibike.graphql_requests import GraphQLRequestError
@@ -196,3 +197,53 @@ async def test_typed_station(hass: HomeAssistant, mock_fetch) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"]["station_id"] == "motivate_BKN_1"
     assert result["data"]["station_name"] == "E 40 St & Park Ave"
+
+
+async def test_station_list_is_fetched_per_flow(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """Each flow fetches the station list, so new stations show up."""
+    for stations in (STATIONS[:1], STATIONS):
+        mock_fetch.return_value = stations
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": config_entries.SOURCE_USER}
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"network": "Citibike"}
+        )
+        options = result["data_schema"].schema["station_id"].config["options"]
+        assert len(options) == len(stations)
+
+
+async def test_station_list_from_loaded_network(
+    hass: HomeAssistant, mock_fetch
+) -> None:
+    """A network that is already set up provides the station list."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "network": "Citibike",
+            "station_id": "motivate_BKN_1",
+            "station_name": "E 40 St & Park Ave",
+        },
+        unique_id="citibike_motivate_BKN_1",
+        minor_version=2,
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert mock_fetch.call_count == 1
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"network": "Citibike"}
+    )
+    assert result["step_id"] == "select_station"
+    assert len(result["data_schema"].schema["station_id"].config["options"]) == 2
+    assert mock_fetch.call_count == 1
+    # Sorting the list for the flow leaves the sensor data alone
+    assert "distance" not in hass.data[DOMAIN]["citibike"].data["motivate_BKN_1"]
+
+    await hass.config_entries.async_unload(entry.entry_id)
