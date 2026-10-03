@@ -2,17 +2,31 @@ name: Tests
 
 on:
   push:
+    branches: ["main"]
   pull_request:
+  schedule:
+    - cron: "0 0 * * 1"
 
 jobs:
   pytest:
+    name: "pytest (${{ matrix.name }})"
     runs-on: "ubuntu-latest"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "latest Home Assistant"
+            python-version: "3.14"
+            requirements: "requirements_test.txt"
+          - name: "minimum Home Assistant"
+            python-version: "3.13"
+            requirements: "requirements_test_min.txt"
     steps:
       - uses: "actions/checkout@v4"
       - uses: "actions/setup-python@v5"
         with:
-          python-version: "3.14"
+          python-version: "${{ matrix.python-version }}"
           cache: "pip"
-          cache-dependency-path: "requirements_test.txt"
-      - run: pip install -r requirements_test.txt
+          cache-dependency-path: "${{ matrix.requirements }}"
+      - run: pip install -r ${{ matrix.requirements }}
       - run: pytest

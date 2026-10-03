@@ -1,0 +1,3 @@
+# The oldest Home Assistant release supported, as declared in hacs.json
+homeassistant==2026.2.0
+pytest-homeassistant-custom-component
