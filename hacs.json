@@ -1,5 +1,6 @@
 {
-	"name": "CitiBike",
+	"name": "Citi Bike",
+    "homeassistant": "2024.11.0",
 	"country": ["US"],
 	"render_readme": true
   }
