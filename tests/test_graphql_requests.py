@@ -1,10 +1,15 @@
 """Tests for the Citibike GraphQL requests."""
 
+from unittest.mock import patch
+
 from aiohttp import ClientError
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
+from pytest_homeassistant_custom_component.test_util.aiohttp import (
+    AiohttpClientMocker,
+    AiohttpClientMockResponse,
+)
 
 from custom_components.citibike.const import NETWORKS_BY_KEY
 from custom_components.citibike.graphql_requests import (
@@ -34,22 +39,56 @@ async def test_fetch_stations(
     assert stations[0]["ebikes"][0]["rideableName"] == "123.4567"
 
 
+@pytest.fixture(autouse=True)
+def no_retry_delay():
+    """Do not wait between attempts."""
+    with patch("custom_components.citibike.graphql_requests.RETRY_DELAY", 0):
+        yield
+
+
 @pytest.mark.parametrize(
-    "response",
+    ("response", "attempts"),
     [
-        {"status": 504},
-        {"exc": ClientError()},
-        {"exc": TimeoutError()},
-        {"text": "not json"},
-        {"json": {"errors": [{"message": "nope"}], "data": None}},
-        {"json": {"data": {"supply": None}}},
+        ({"status": 504}, 3),
+        ({"exc": ClientError()}, 3),
+        ({"exc": TimeoutError()}, 3),
+        ({"status": 400}, 1),
+        ({"text": "not json"}, 1),
+        ({"json": {"errors": [{"message": "nope"}], "data": None}}, 1),
+        ({"json": {"data": {"supply": None}}}, 1),
     ],
 )
 async def test_fetch_stations_errors(
-    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker, response: dict
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    response: dict,
+    attempts: int,
 ) -> None:
-    """Connection problems and unusable responses raise one error type."""
+    """Failures raise one error type; only transient ones are retried."""
     aioclient_mock.post(ENDPOINT, **response)
 
     with pytest.raises(GraphQLRequestError):
         await fetch_stations(async_get_clientsession(hass), ENDPOINT, {})
+
+    assert aioclient_mock.call_count == attempts
+
+
+async def test_fetch_stations_retries(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """A gateway timeout followed by a good response succeeds."""
+    station = make_station("E 40 St & Park Ave", "motivate_BKN_1", 0, 0)
+    responses = [
+        AiohttpClientMockResponse("post", ENDPOINT, status=504),
+        AiohttpClientMockResponse("post", ENDPOINT, json=supply_response([station])),
+    ]
+
+    async def respond(method, url, data):
+        return responses.pop(0)
+
+    aioclient_mock.post(ENDPOINT, side_effect=respond)
+
+    stations = await fetch_stations(async_get_clientsession(hass), ENDPOINT, {})
+
+    assert len(stations) == 1
+    assert aioclient_mock.call_count == 2
