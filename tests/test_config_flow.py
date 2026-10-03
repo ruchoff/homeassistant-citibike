@@ -27,11 +27,11 @@ async def test_full_flow(hass: HomeAssistant, mock_fetch) -> None:
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "select_station"
     # Closest station to home is offered first
-    options = result["data_schema"].schema["station_id"].container
-    assert list(options.values()) == ["W 21 St & 6 Ave", "E 40 St & Park Ave"]
+    options = result["data_schema"].schema["station_id"].config["options"]
+    assert options == ["W 21 St & 6 Ave", "E 40 St & Park Ave"]
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"station_id": "motivate_BKN_1"}
+        result["flow_id"], {"station_id": "E 40 St & Park Ave"}
     )
     await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -102,7 +102,7 @@ async def test_partial_region_failure_is_not_cached(
         result["flow_id"], {"network": "Bay Wheels"}
     )
     assert result["step_id"] == "select_station"
-    assert len(result["data_schema"].schema["station_id"].container) == 2
+    assert len(result["data_schema"].schema["station_id"].config["options"]) == 2
 
 
 async def test_already_configured(hass: HomeAssistant, mock_fetch) -> None:
@@ -115,7 +115,7 @@ async def test_already_configured(hass: HomeAssistant, mock_fetch) -> None:
             result["flow_id"], {"network": "Citibike"}
         )
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"station_id": "motivate_BKN_1"}
+            result["flow_id"], {"station_id": "E 40 St & Park Ave"}
         )
         await hass.async_block_till_done()
         assert result["type"] is expected
@@ -135,7 +135,7 @@ async def test_same_station_name_on_another_network(
             result["flow_id"], {"network": network}
         )
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"station_id": "motivate_BKN_1"}
+            result["flow_id"], {"station_id": "E 40 St & Park Ave"}
         )
         await hass.async_block_till_done()
         assert result["type"] is FlowResultType.CREATE_ENTRY
@@ -143,21 +143,56 @@ async def test_same_station_name_on_another_network(
 
 async def test_duplicate_station_names(hass: HomeAssistant, mock_fetch) -> None:
     """Two stations sharing a name are both offered and can both be added."""
+    hass.config.latitude = 40.71
+    hass.config.longitude = -73.98
     mock_fetch.return_value = [
         make_station("Clinton St & Grand St", "motivate_BKN_1", 40.71, -73.98),
         make_station("Clinton St & Grand St", "motivate_BKN_2", 40.72, -73.99),
     ]
 
-    for station_id in ("motivate_BKN_1", "motivate_BKN_2"):
+    choices = {
+        "Clinton St & Grand St": "motivate_BKN_1",
+        "Clinton St & Grand St (2)": "motivate_BKN_2",
+    }
+    for choice, station_id in choices.items():
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"network": "Citibike"}
         )
-        assert len(result["data_schema"].schema["station_id"].container) == 2
+        options = result["data_schema"].schema["station_id"].config["options"]
+        assert options == list(choices)
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"station_id": station_id}
+            result["flow_id"], {"station_id": choice}
         )
         await hass.async_block_till_done()
         assert result["type"] is FlowResultType.CREATE_ENTRY
+        assert result["data"]["station_id"] == station_id
+        assert result["data"]["station_name"] == "Clinton St & Grand St"
+
+
+async def test_typed_station(hass: HomeAssistant, mock_fetch) -> None:
+    """Typed text must name a station; a typed station name is accepted."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"network": "Citibike"}
+    )
+    assert result["data_schema"].schema["station_id"].config["custom_value"]
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"station_id": "not-a-station"}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "select_station"
+    assert result["errors"] == {"station_id": "invalid_station"}
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"station_id": " e 40 st & park ave"}
+    )
+    await hass.async_block_till_done()
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"]["station_id"] == "motivate_BKN_1"
+    assert result["data"]["station_name"] == "E 40 St & Park Ave"

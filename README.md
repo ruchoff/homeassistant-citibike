@@ -24,7 +24,7 @@ This integration provides real-time data about bike share stations across multip
 - Display additional station attributes, such as location, capacity, and availability of bike types
 - Automatically updates data at regular intervals to provide real-time information
 - Choose from multiple bike share networks and view station details within the selected network
-- Station selection list is sorted by distance to your Home Zone for easy setup
+- Station selection list is searchable by name and sorted by distance to your home location for easy setup
 - One request per network per update, shared by all the stations you monitor on it
 
 ## Installation

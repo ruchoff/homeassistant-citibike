@@ -5,6 +5,11 @@ from typing import Any
 
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 from homeassistant.util.location import distance
 import voluptuous as vol
 
@@ -33,6 +38,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Initialize the config flow."""
         self._config: dict = {}
         self._stations: list[dict[str, str]] = []
+        self._station_choices: dict[str, dict[str, Any]] = {}
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -66,14 +72,13 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         """Handle the step to select a station within the selected network."""
         _LOGGER.debug("Starting step to select a station")
+        errors = {}
 
-        if user_input is not None:
-            station_id = user_input[CONF_STATION_ID]
-            station_name = next(
-                station["stationName"]
-                for station in self._stations
-                if station["stationId"] == station_id
-            )
+        if user_input is not None and (
+            station := self._find_station(user_input[CONF_STATION_ID])
+        ):
+            station_id = station["stationId"]
+            station_name = station["stationName"]
             self._config[CONF_STATION_ID] = station_id
             self._config[CONF_STATION_NAME] = station_name
             _LOGGER.debug("Station selected: %s (%s)", station_name, station_id)
@@ -92,6 +97,9 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 data=self._config,
             )
 
+        if user_input is not None:
+            errors[CONF_STATION_ID] = "invalid_station"
+
         # Calculate distance to home and sort stations
         home_lat = self.hass.config.latitude
         home_lon = self.hass.config.longitude
@@ -102,19 +110,48 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         self._stations.sort(key=lambda x: x["distance"])
 
-        # Create a dropdown list of stations, selected by ID and shown by name
-        station_options = {
-            station["stationId"]: station["stationName"] for station in self._stations
-        }
+        # Create a dropdown of station names in order of distance. The frontend
+        # only offers type-to-search on a dropdown that accepts custom values,
+        # and then shows the option value in the box, so the names themselves
+        # are the values and are mapped back to stations in _find_station.
+        self._station_choices = {}
+        for station in self._stations:
+            label = name = station["stationName"]
+            count = 1
+            while label in self._station_choices:
+                count += 1
+                label = f"{name} ({count})"
+            self._station_choices[label] = station
 
         return self.async_show_form(
             step_id="select_station",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_STATION_ID): vol.In(station_options),
+                    vol.Required(CONF_STATION_ID): SelectSelector(
+                        SelectSelectorConfig(
+                            options=list(self._station_choices),
+                            mode=SelectSelectorMode.DROPDOWN,
+                            custom_value=True,
+                        )
+                    ),
                 }
             ),
+            errors=errors,
         )
+
+    def _find_station(self, value: str) -> dict[str, Any] | None:
+        """Return the station picked from the list or typed by name."""
+        if station := self._station_choices.get(value):
+            return station
+
+        # Typed text is only accepted when it names exactly one station
+        name = value.strip().casefold()
+        matches = [
+            station
+            for label, station in self._station_choices.items()
+            if label.casefold() == name
+        ]
+        return matches[0] if len(matches) == 1 else None
 
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
