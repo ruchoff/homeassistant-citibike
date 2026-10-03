@@ -53,7 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     @callback
     def _async_sync_station_name() -> None:
-        """Follow a station that was renamed by its network."""
+        """Follow a station or network that was renamed."""
         _async_update_station_name(hass, entry, coordinator)
 
     _async_sync_station_name()
@@ -64,27 +64,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 def _async_update_station_name(
     hass: HomeAssistant, entry: ConfigEntry, coordinator: CitibikeCoordinator
 ) -> None:
-    """Rename the entry and its device when the station's name has changed."""
+    """Keep the entry and its device named after the network and station."""
+    network = coordinator.network
     station = coordinator.data.get(entry.data[CONF_STATION_ID])
     old_name = entry.data[CONF_STATION_NAME]
-    if station is None or (new_name := station["stationName"]) == old_name:
-        return
+    new_name = station["stationName"] if station else old_name
 
-    network_name = coordinator.network.name
     # Leave a title the user has changed alone
     title = entry.title
-    if title == f"{network_name} {old_name}":
-        title = f"{network_name} {new_name}"
+    if title in {
+        f"{network_name} {old_name}"
+        for network_name in (network.name, *network.former_names)
+    }:
+        title = f"{network.name} {new_name}"
+
+    if new_name == old_name and title == entry.title:
+        return
 
     hass.config_entries.async_update_entry(
         entry, data={**entry.data, CONF_STATION_NAME: new_name}, title=title
     )
 
+    if new_name == old_name:
+        return
+
     # A name the user gave the device is stored separately and is kept
     device_registry = dr.async_get(hass)
     for device in dr.async_entries_for_config_entry(device_registry, entry.entry_id):
         device_registry.async_update_device(
-            device.id, name=f"{network_name} {new_name}"
+            device.id, name=f"{network.name} {new_name}"
         )
 
 

@@ -41,7 +41,7 @@ This integration provides real-time data about bike share stations across multip
 
 1. In Home Assistant, navigate to **Settings** > **Devices & Services**.
 2. Click **Add Integration** and search for "Citi Bike".
-3. Select the **Network** you want to track (e.g., Citibike, Bay Wheels, Divvy, Capital Bikeshare, or BIKETOWN).
+3. Select the **Network** you want to track (e.g., Citi Bike, Bay Wheels, Divvy, Capital Bikeshare, or BIKETOWN).
 4. After selecting the network, a dropdown will appear with a list of stations within that network. Choose the station you want to monitor.
 
 Repeat these steps for each station you want to track. Each station is added as a device.
@@ -67,7 +67,7 @@ The main sensor also includes the following attributes:
 |----------------------------|-----------------------------------------------------------------------------------------------------------|------------------------|
 | **station_id**              | The unique identifier for the station.                                                                     | `6432.11`              |
 | **station_name**            | The name or location of the station.                                                                       | `E 40 St & Park Ave`   |
-| **network**                 | The name of the bike share network of the station.                                                   | `Citibike`             |
+| **network**                 | The name of the bike share network of the station.                                                   | `Citi Bike`            |
 | **latitude**                | The latitude coordinate of the station.                                                                   | `40.748817`            |
 | **longitude**               | The longitude coordinate of the station.                                                                  | `-73.985428`           |
 | **total_rideables_available** | The total number of rideables (bikes and e-bikes) available for rent.                                     | `23`                   |

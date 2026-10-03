@@ -36,7 +36,7 @@ async def test_full_flow(hass: HomeAssistant, mock_fetch) -> None:
     )
     await hass.async_block_till_done()
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Citibike E 40 St & Park Ave"
+    assert result["title"] == "Citi Bike E 40 St & Park Ave"
     assert result["data"] == {
         "network": "citibike",
         "station_id": "motivate_BKN_1",

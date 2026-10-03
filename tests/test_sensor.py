@@ -18,7 +18,7 @@ from custom_components.citibike.sensor import SENSOR_DESCRIPTIONS
 
 from .conftest import STATIONS, make_station
 
-ENTITY_ID = "sensor.citibike_e_40_st_park_ave"
+ENTITY_ID = "sensor.citi_bike_e_40_st_park_ave"
 
 
 def make_entry(
@@ -36,7 +36,7 @@ def make_entry(
         },
         unique_id=f"citibike_{station_id}",
         minor_version=3,
-        title=title or f"Citibike {station_name}",
+        title=title or f"Citi Bike {station_name}",
     )
 
 
@@ -75,14 +75,14 @@ async def test_sensor_state(
     assert state.attributes["last_reported"] == datetime(
         2025, 1, 1, 22, 59, 59, tzinfo=UTC
     )
-    assert state.attributes["friendly_name"] == "Citibike E 40 St & Park Ave"
+    assert state.attributes["friendly_name"] == "Citi Bike E 40 St & Park Ave"
     assert state.attributes["unit_of_measurement"] == "rideables"
     assert state.attributes["state_class"] == "measurement"
 
     entity = entity_registry.async_get(ENTITY_ID)
     assert entity.unique_id == "citibike_motivate_BKN_1"
     device = device_registry.async_get(entity.device_id)
-    assert device.name == "Citibike E 40 St & Park Ave"
+    assert device.name == "Citi Bike E 40 St & Park Ave"
 
 
 async def test_updates_every_interval(hass: HomeAssistant, mock_fetch) -> None:
@@ -165,17 +165,17 @@ async def test_station_rename(
     state = hass.states.get(ENTITY_ID)
     assert state.state == "7"
     assert state.attributes["station_name"] == "Park Ave & E 40 St"
-    assert state.attributes["friendly_name"] == "Citibike Park Ave & E 40 St"
+    assert state.attributes["friendly_name"] == "Citi Bike Park Ave & E 40 St"
     assert (
         hass.states.get(f"{ENTITY_ID}_docks_available").attributes["friendly_name"]
-        == "Citibike Park Ave & E 40 St Docks available"
+        == "Citi Bike Park Ave & E 40 St Docks available"
     )
 
-    assert entry.title == "Citibike Park Ave & E 40 St"
+    assert entry.title == "Citi Bike Park Ave & E 40 St"
     assert entry.data["station_name"] == "Park Ave & E 40 St"
     assert entry.state is ConfigEntryState.LOADED
     (device,) = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
-    assert device.name == "Citibike Park Ave & E 40 St"
+    assert device.name == "Citi Bike Park Ave & E 40 St"
 
 
 async def test_station_rename_while_stopped(
@@ -189,7 +189,7 @@ async def test_station_rename_while_stopped(
     # A title the user changed is kept
     assert entry.title == "My bike station"
     (device,) = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
-    assert device.name == "Citibike E 40 St & Park Ave"
+    assert device.name == "Citi Bike E 40 St & Park Ave"
 
 
 def make_legacy_entry() -> MockConfigEntry:
@@ -312,7 +312,7 @@ async def test_migrate_network_name(hass: HomeAssistant, mock_fetch) -> None:
     assert entry.state is ConfigEntryState.LOADED
     assert entry.minor_version == 3
     assert entry.data["network"] == "citibike"
-    assert hass.states.get(ENTITY_ID).attributes["network"] == "Citibike"
+    assert hass.states.get(ENTITY_ID).attributes["network"] == "Citi Bike"
 
 
 async def test_malformed_ebikes(hass: HomeAssistant, mock_fetch) -> None:
@@ -376,3 +376,22 @@ async def test_malformed_ebikes(hass: HomeAssistant, mock_fetch) -> None:
     await tick(hass)
     assert hass.states.get(ENTITY_ID).attributes["ebike_status"] == []
     assert hass.states.get(f"{ENTITY_ID}_max_e_bike_range").state == "0"
+
+
+async def test_network_display_name_change(
+    hass: HomeAssistant, device_registry: dr.DeviceRegistry, mock_fetch
+) -> None:
+    """An entry titled with a network's former name follows the new name."""
+    entry = make_entry(title="Citibike E 40 St & Park Ave")
+    entry.add_to_hass(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "citibike_motivate_BKN_1")},
+        name="Citibike E 40 St & Park Ave",
+    )
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.title == "Citi Bike E 40 St & Park Ave"
+    (device,) = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
+    assert device.name == "Citi Bike E 40 St & Park Ave"

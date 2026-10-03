@@ -22,14 +22,17 @@ class Network:
     name: str
     endpoint: str
     regions: tuple[str, ...]
+    # Display names the network had in earlier versions
+    former_names: tuple[str, ...] = ()
 
 
 NETWORKS: tuple[Network, ...] = (
     Network(
         key="citibike",
-        name="Citibike",
+        name="Citi Bike",
         endpoint="https://account.citibikenyc.com/bikesharefe-gql",
         regions=("BKN",),
+        former_names=("Citibike",),
     ),
     Network(
         key="baywheels",
