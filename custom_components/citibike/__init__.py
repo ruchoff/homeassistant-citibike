@@ -2,12 +2,19 @@
 
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry, ConfigEntryState
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers import config_validation as cv
 import voluptuous as vol
 
-from .const import DOMAIN, NetworkNames
+from .const import (
+    CONF_LEGACY_STATION_NAME,
+    CONF_STATION_ID,
+    CONF_STATION_NAME,
+    DOMAIN,
+    NetworkNames,
+)
 from .coordinator import CitibikeCoordinator
 
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -33,9 +40,48 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if coordinator.data is None:
         raise ConfigEntryNotReady(f"Could not fetch stations for {network.value}")
 
+    if CONF_STATION_ID not in entry.data:
+        _async_migrate_station_name(hass, entry, coordinator)
+
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _async_migrate_station_name(
+    hass: HomeAssistant, entry: ConfigEntry, coordinator: CitibikeCoordinator
+) -> None:
+    """Identify a station that was configured by name by its station ID."""
+    station_name = entry.data[CONF_LEGACY_STATION_NAME]
+    station = next(
+        (s for s in coordinator.data.values() if s["stationName"] == station_name),
+        None,
+    )
+    if station is None:
+        raise ConfigEntryError(
+            f"Station {station_name} no longer exists on {coordinator.network.value}; "
+            "remove it and add the station again"
+        )
+
+    station_id = station["stationId"]
+    unique_id = f"{coordinator.network.name.lower()}_{station_id}"
+
+    # The entity used the station name as its unique ID; keep its history
+    registry = er.async_get(hass)
+    for entity in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if entity.unique_id == station_name:
+            registry.async_update_entity(entity.entity_id, new_unique_id=unique_id)
+
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            "network": entry.data["network"],
+            CONF_STATION_ID: station_id,
+            CONF_STATION_NAME: station_name,
+        },
+        unique_id=unique_id,
+        minor_version=2,
+    )
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

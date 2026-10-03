@@ -5,7 +5,10 @@ from enum import Enum
 
 DOMAIN = "citibike"
 
-CONF_STATIONID = "id"
+CONF_STATION_ID = "station_id"
+CONF_STATION_NAME = "station_name"
+# Entries created before station IDs were stored only hold the station name
+CONF_LEGACY_STATION_NAME = "id"
 
 UPDATE_INTERVAL = timedelta(minutes=5)
 

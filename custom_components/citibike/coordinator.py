@@ -42,7 +42,7 @@ class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 await self.async_refresh()
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
-        """Fetch the stations of every region, keyed by station name."""
+        """Fetch the stations of every region, keyed by station ID."""
         network_name = self.network.name
         stations: dict[str, dict[str, Any]] = {}
 
@@ -73,7 +73,7 @@ class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 ) from err
 
             for station in region_stations:
-                stations[station["stationName"]] = station
+                stations[station["stationId"]] = station
 
         if not stations:
             raise UpdateFailed(f"No stations retrieved for network {network_name}")

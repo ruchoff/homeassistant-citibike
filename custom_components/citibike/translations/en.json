@@ -16,10 +16,10 @@
 			},
 			"select_station": {
 				"data": {
-					"id": "Station Name"
+					"station_id": "Station Name"
 				},
 				"data_description": {
-					"id": "Sorted by distance to your home zone."
+					"station_id": "Sorted by distance to your home zone."
 				},
 				"title": "Station selection",
 				"description": "Select the bike share station you want to track."

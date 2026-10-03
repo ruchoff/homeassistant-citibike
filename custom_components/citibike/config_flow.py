@@ -11,7 +11,8 @@ from homeassistant import config_entries
 
 from .cache import StationCache
 from .const import (
-    CONF_STATIONID,
+    CONF_STATION_ID,
+    CONF_STATION_NAME,
     DOMAIN,
     NetworkGraphQLEndpoints,
     NetworkNames,
@@ -25,6 +26,9 @@ _LOGGER = logging.getLogger(__name__)
 
 class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Citibike."""
+
+    VERSION = 1
+    MINOR_VERSION = 2
 
     # Class level cache configuration
     _stations_cache: ClassVar[dict[str, StationCache]] = {}
@@ -69,22 +73,27 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.debug("Starting step to select a station")
 
         if user_input is not None:
-            self._config[CONF_STATIONID] = user_input[CONF_STATIONID]
-            _LOGGER.debug("Station selected: %s", user_input[CONF_STATIONID])
-
-            # Set unique ID for the sensor name
-            await self.async_set_unique_id(
-                f"{self._config['network'].lower()}_{user_input[CONF_STATIONID].lower()}"
+            station_id = user_input[CONF_STATION_ID]
+            station_name = next(
+                station["stationName"]
+                for station in self._stations
+                if station["stationId"] == station_id
             )
+            self._config[CONF_STATION_ID] = station_id
+            self._config[CONF_STATION_NAME] = station_name
+            _LOGGER.debug("Station selected: %s (%s)", station_name, station_id)
+
+            network = NetworkNames(self._config["network"])
+            await self.async_set_unique_id(f"{network.name.lower()}_{station_id}")
             self._abort_if_unique_id_configured()
 
             _LOGGER.debug(
                 "Creating entry for network %s and station %s",
                 self._config["network"],
-                user_input[CONF_STATIONID],
+                station_name,
             )
             return self.async_create_entry(
-                title=f"{self._config['network']} {user_input[CONF_STATIONID]}",
+                title=f"{self._config['network']} {station_name}",
                 data=self._config,
             )
 
@@ -97,16 +106,16 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         self._stations.sort(key=lambda x: x["distance"])
 
-        # Create a dropdown list of stations
+        # Create a dropdown list of stations, selected by ID and shown by name
         station_options = {
-            station["stationName"]: station["stationName"] for station in self._stations
+            station["stationId"]: station["stationName"] for station in self._stations
         }
 
         return self.async_show_form(
             step_id="select_station",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_STATIONID): vol.In(station_options),
+                    vol.Required(CONF_STATION_ID): vol.In(station_options),
                 }
             ),
         )

@@ -7,7 +7,7 @@ from typing import Any
 from homeassistant import config_entries, core
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_STATIONID
+from .const import CONF_STATION_ID, CONF_STATION_NAME
 from .coordinator import CitibikeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -27,9 +27,10 @@ class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator]):
     def __init__(self, coordinator: CitibikeCoordinator, config: dict) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
-        self._id = config[CONF_STATIONID]
+        self._id = config[CONF_STATION_ID]
         self._network = coordinator.network.value
-        self._name = f"{self._network}_{self._id}"
+        self._name = f"{self._network}_{config[CONF_STATION_NAME]}"
+        self._unique_id = f"{coordinator.network.name.lower()}_{self._id}"
 
     @property
     def _station(self) -> dict[str, Any] | None:
@@ -56,7 +57,7 @@ class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator]):
     @property
     def unique_id(self) -> str:
         """Return the unique ID of the sensor."""
-        return self._id
+        return self._unique_id
 
     @property
     def device_class(self) -> str:
@@ -95,7 +96,7 @@ class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator]):
 
         return {
             "station_id": station["siteId"],
-            "station_name": self._id,
+            "station_name": station["stationName"],
             "network": self._network,
             "latitude": station["location"]["lat"],
             "longitude": station["location"]["lng"],
