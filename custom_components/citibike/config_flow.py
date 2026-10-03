@@ -3,11 +3,10 @@
 import logging
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.util.location import distance
+import voluptuous as vol
 
 from .cache import StationCache
 from .const import (

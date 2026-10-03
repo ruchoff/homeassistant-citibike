@@ -1,3 +1,5 @@
+"""GraphQL requests for the Citibike integration."""
+
 import logging
 from typing import Any
 
@@ -56,6 +58,4 @@ def clean_data(stations: list[dict[str, Any]]) -> None:
 
         for scooter in station.get("scooters", []):
             if "rideableName" in scooter:
-                scooter["rideableName"] = scooter["rideableName"].replace(
-                    "·", "."
-                )
+                scooter["rideableName"] = scooter["rideableName"].replace("·", ".")

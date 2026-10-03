@@ -53,9 +53,7 @@ class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             # A partial result would make the missing region's stations look
             # removed, so fail the whole update instead.
             try:
-                region_stations = await fetch_stations(
-                    session, network.endpoint, query
-                )
+                region_stations = await fetch_stations(session, network.endpoint, query)
             except GraphQLRequestError as err:
                 raise UpdateFailed(
                     f"Fetch failed for network {network.name} region {region_code}: {err}"
