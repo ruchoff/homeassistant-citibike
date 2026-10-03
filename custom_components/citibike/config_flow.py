@@ -35,7 +35,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize the config flow."""
-        self._config: dict = {}
+        self._config: dict[str, Any] = {}
         self._stations: list[dict[str, Any]] = []
         self._station_choices: dict[str, dict[str, Any]] = {}
 
@@ -44,7 +44,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         """Handle the initial step to select a network."""
         _LOGGER.debug("Starting user step to select a network")
-        errors = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None:
             self._config[CONF_NETWORK] = user_input[CONF_NETWORK]
@@ -71,7 +71,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> config_entries.ConfigFlowResult:
         """Handle the step to select a station within the selected network."""
         _LOGGER.debug("Starting step to select a station")
-        errors = {}
+        errors: dict[str, str] = {}
 
         if user_input is not None and (
             station := self._find_station(user_input[CONF_STATION_ID])
@@ -169,7 +169,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         region_codes = network.regions
         session = async_get_clientsession(self.hass)
-        all_stations: list[dict] = []
+        all_stations: list[dict[str, Any]] = []
 
         for region_code in region_codes:
             query = {

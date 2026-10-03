@@ -1,11 +1,10 @@
 """Integration for Citibike sensors."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 import logging
 from typing import Any
 
-from homeassistant import config_entries, core
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -13,12 +12,14 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import UnitOfLength
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import CONF_STATION_ID, CONF_STATION_NAME, DOMAIN
-from .coordinator import CitibikeCoordinator
+from .coordinator import CitibikeConfigEntry, CitibikeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,7 +70,6 @@ SENSOR_DESCRIPTIONS: tuple[CitibikeSensorEntityDescription, ...] = (
     CitibikeSensorEntityDescription(
         key="docks_available",
         translation_key="docks_available",
-        icon="mdi:parking",
         native_unit_of_measurement="docks",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda station: station["bikeDocksAvailable"],
@@ -77,7 +77,6 @@ SENSOR_DESCRIPTIONS: tuple[CitibikeSensorEntityDescription, ...] = (
     CitibikeSensorEntityDescription(
         key="bikes_available",
         translation_key="bikes_available",
-        icon="mdi:bicycle",
         native_unit_of_measurement="bikes",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda station: station["bikesAvailable"],
@@ -85,7 +84,6 @@ SENSOR_DESCRIPTIONS: tuple[CitibikeSensorEntityDescription, ...] = (
     CitibikeSensorEntityDescription(
         key="ebikes_available",
         translation_key="ebikes_available",
-        icon="mdi:bicycle-electric",
         native_unit_of_measurement="bikes",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda station: station["ebikesAvailable"],
@@ -93,7 +91,6 @@ SENSOR_DESCRIPTIONS: tuple[CitibikeSensorEntityDescription, ...] = (
     CitibikeSensorEntityDescription(
         key="max_ebike_distance",
         translation_key="max_ebike_distance",
-        icon="mdi:battery-charging",
         device_class=SensorDeviceClass.DISTANCE,
         native_unit_of_measurement=UnitOfLength.MILES,
         state_class=SensorStateClass.MEASUREMENT,
@@ -103,11 +100,13 @@ SENSOR_DESCRIPTIONS: tuple[CitibikeSensorEntityDescription, ...] = (
 
 
 async def async_setup_entry(
-    hass: core.HomeAssistant, entry: config_entries.ConfigEntry, async_add_entities
+    hass: HomeAssistant,
+    entry: CitibikeConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Citibike sensors from a config entry."""
     _LOGGER.debug("Setting up Citibike sensor entry")
-    coordinator: CitibikeCoordinator = entry.runtime_data
+    coordinator = entry.runtime_data
     async_add_entities(
         [
             CitibikeSensor(coordinator, entry.data),
@@ -124,7 +123,9 @@ class CitibikeStationEntity(CoordinatorEntity[CitibikeCoordinator], SensorEntity
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: CitibikeCoordinator, config: dict) -> None:
+    def __init__(
+        self, coordinator: CitibikeCoordinator, config: Mapping[str, Any]
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._id = config[CONF_STATION_ID]
@@ -153,13 +154,15 @@ class CitibikeSensor(CitibikeStationEntity):
 
     # The sensor is the station's main feature, so it takes the device name
     _attr_name = None
-    _attr_icon = "mdi:bicycle"
+    _attr_translation_key = "rideables"
     _attr_native_unit_of_measurement = "rideables"
     _attr_state_class = SensorStateClass.MEASUREMENT
     # A per-bike list that changes on almost every update
     _unrecorded_attributes = frozenset({"ebike_status"})
 
-    def __init__(self, coordinator: CitibikeCoordinator, config: dict) -> None:
+    def __init__(
+        self, coordinator: CitibikeCoordinator, config: Mapping[str, Any]
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator, config)
         self._attr_unique_id = self._station_unique_id
@@ -172,7 +175,7 @@ class CitibikeSensor(CitibikeStationEntity):
         return station["totalRideablesAvailable"]
 
     @property
-    def extra_state_attributes(self) -> dict | None:
+    def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return the attributes of the sensor."""
         if (station := self._station) is None:
             return None
@@ -217,7 +220,7 @@ class CitibikeStationValueSensor(CitibikeStationEntity):
     def __init__(
         self,
         coordinator: CitibikeCoordinator,
-        config: dict,
+        config: Mapping[str, Any],
         description: CitibikeSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""

@@ -1,14 +1,10 @@
 """Integration for Citi Bike."""
 
-from homeassistant.config_entries import ConfigEntry, ConfigEntryState
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
-from homeassistant.helpers import (
-    config_validation as cv,
-    device_registry as dr,
-    entity_registry as er,
-)
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers import device_registry as dr, entity_registry as er
 
 from .const import (
     CONF_LEGACY_STATION_NAME,
@@ -20,19 +16,12 @@ from .const import (
     NETWORKS_BY_KEY,
     Network,
 )
-from .coordinator import CitibikeCoordinator
+from .coordinator import CitibikeConfigEntry, CitibikeCoordinator
 
-CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
-
-PLATFORMS = ["sensor"]
+PLATFORMS = [Platform.SENSOR]
 
 
-async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up the Citibike integration."""
-    return True
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: CitibikeConfigEntry) -> bool:
     """Set up Citibike from a config entry."""
     network = _async_get_network(hass, entry)
 
@@ -62,7 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 def _async_update_station_name(
-    hass: HomeAssistant, entry: ConfigEntry, coordinator: CitibikeCoordinator
+    hass: HomeAssistant, entry: CitibikeConfigEntry, coordinator: CitibikeCoordinator
 ) -> None:
     """Keep the entry and its device named after the network and station."""
     network = coordinator.network
@@ -96,7 +85,7 @@ def _async_update_station_name(
         )
 
 
-def _async_get_network(hass: HomeAssistant, entry: ConfigEntry) -> Network:
+def _async_get_network(hass: HomeAssistant, entry: CitibikeConfigEntry) -> Network:
     """Return the entry's network, migrating a network stored by display name."""
     value = entry.data[CONF_NETWORK]
     if (network := NETWORKS_BY_KEY.get(value)) is not None:
@@ -117,7 +106,7 @@ def _async_get_network(hass: HomeAssistant, entry: ConfigEntry) -> Network:
 
 
 def _async_migrate_station_name(
-    hass: HomeAssistant, entry: ConfigEntry, coordinator: CitibikeCoordinator
+    hass: HomeAssistant, entry: CitibikeConfigEntry, coordinator: CitibikeCoordinator
 ) -> None:
     """Identify a station that was configured by name by its station ID."""
     station_name = entry.data[CONF_LEGACY_STATION_NAME]
@@ -152,7 +141,7 @@ def _async_migrate_station_name(
     )
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: CitibikeConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 

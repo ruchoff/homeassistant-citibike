@@ -7,9 +7,6 @@ import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
-# Default headers
-DEFAULT_HEADERS = {"Content-Type": "application/json"}
-
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
 
 
@@ -21,16 +18,11 @@ async def fetch_stations(
     session: aiohttp.ClientSession,
     endpoint: str,
     query: dict[str, Any],
-    headers: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Fetch the stations of a supply query from the GraphQL API and clean them."""
-    # Use default headers if no headers are passed
-    if headers is None:
-        headers = DEFAULT_HEADERS
-
     try:
         async with session.post(
-            endpoint, json=query, headers=headers, timeout=REQUEST_TIMEOUT
+            endpoint, json=query, timeout=REQUEST_TIMEOUT
         ) as response:
             if response.status != 200:
                 raise GraphQLRequestError(f"{endpoint} returned HTTP {response.status}")

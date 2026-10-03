@@ -4,6 +4,7 @@ import asyncio
 import logging
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -13,6 +14,8 @@ from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
 from .graphql_requests import GraphQLRequestError, fetch_stations
 
 _LOGGER = logging.getLogger(__name__)
+
+type CitibikeConfigEntry = ConfigEntry[CitibikeCoordinator]
 
 
 class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):

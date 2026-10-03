@@ -1,0 +1,21 @@
+{
+    "entity": {
+        "sensor": {
+            "rideables": {
+                "default": "mdi:bicycle"
+            },
+            "docks_available": {
+                "default": "mdi:parking"
+            },
+            "bikes_available": {
+                "default": "mdi:bicycle"
+            },
+            "ebikes_available": {
+                "default": "mdi:bicycle-electric"
+            },
+            "max_ebike_distance": {
+                "default": "mdi:battery-charging"
+            }
+        }
+    }
+}
