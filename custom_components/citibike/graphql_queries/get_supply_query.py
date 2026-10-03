@@ -4,6 +4,7 @@ GET_SUPPLY_QUERY = """
     query GetSupply($input: SupplyInput) {
         supply(input: $input) {
             stations {
+                stationId
                 stationName
                 location {
                     lat

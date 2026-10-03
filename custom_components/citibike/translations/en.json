@@ -4,7 +4,8 @@
 			"already_configured": "Station is already configured."
 		},
 		"error": {
-			"invalid_station_id": "Invalid station ID."
+			"cannot_connect": "Could not load the station list for this network. Try again later.",
+            "invalid_station": "Pick a station from the list."
 		},
 		"step": {
 			"user": {
@@ -16,13 +17,29 @@
 			},
 			"select_station": {
 				"data": {
-					"id": "Station Name"
+					"station_id": "Station Name"
 				},
 				"data_description": {
-					"id": "Sorted by distance to your home zone."
+					"station_id": "Type to search by name. Stations are listed by distance to your home location."
 				},
 				"title": "Station selection",
 				"description": "Select the bike share station you want to track."
+			}
+		}
+	},
+	"entity": {
+		"sensor": {
+			"docks_available": {
+				"name": "Docks available"
+			},
+			"bikes_available": {
+				"name": "Classic bikes available"
+			},
+			"ebikes_available": {
+				"name": "E-bikes available"
+			},
+			"max_ebike_distance": {
+				"name": "Max e-bike range"
 			}
 		}
 	}

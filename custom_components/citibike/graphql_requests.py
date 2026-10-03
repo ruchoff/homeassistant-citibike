@@ -1,63 +1,81 @@
-import json
+"""GraphQL requests for the Citibike integration."""
+
+import asyncio
 import logging
 from typing import Any
 
 import aiohttp
 
-from .const import NetworkGraphQLEndpoints
-
 _LOGGER = logging.getLogger(__name__)
 
-# Default headers
-DEFAULT_HEADERS = {"Content-Type": "application/json"}
+REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=30)
+
+# The API is slow and regularly answers 504 when its own backend times out
+MAX_ATTEMPTS = 3
+RETRY_DELAY = 2
 
 
-async def fetch_graphql_data(
-    endpoint: NetworkGraphQLEndpoints,
+class GraphQLRequestError(Exception):
+    """The GraphQL API could not be reached or returned an unusable response."""
+
+
+class _TransientRequestError(GraphQLRequestError):
+    """A failure that is worth retrying."""
+
+
+async def fetch_stations(
+    session: aiohttp.ClientSession,
+    endpoint: str,
     query: dict[str, Any],
-    headers: dict[str, str] | None = None,
-) -> dict[str, Any]:
-    """Fetch data from the GraphQL API and clean it."""
-    # Use default headers if no headers are passed
-    if headers is None:
-        headers = DEFAULT_HEADERS
+) -> list[dict[str, Any]]:
+    """Fetch the stations of a supply query from the GraphQL API and clean them."""
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            data = await _post(session, endpoint, query)
+            break
+        except _TransientRequestError as err:
+            if attempt == MAX_ATTEMPTS:
+                raise
+            _LOGGER.debug(
+                "Attempt %d of %d failed, retrying: %s", attempt, MAX_ATTEMPTS, err
+            )
+            await asyncio.sleep(RETRY_DELAY)
 
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                endpoint.value, json=query, headers=headers
-            ) as response:
-                if response.status != 200:
-                    _LOGGER.error(
-                        "Failed to connect: %s, %s",
-                        response.status,
-                        await response.text(),
-                    )
-                    return {"base": "cannot_connect"}
-                _LOGGER.debug("Successfully fetched data from GraphQL API")
-                data = await response.json()
+        stations = data["data"]["supply"]["stations"]
+    except (KeyError, TypeError) as err:
+        raise GraphQLRequestError(f"Unexpected response from {endpoint}") from err
 
-                # Clean the data here
-                clean_data(data)
+    _LOGGER.debug("Successfully fetched data from GraphQL API")
+    clean_data(stations)
 
-                return data
-    except Exception as e:
-        _LOGGER.error("Error during GraphQL request: %s", str(e))
-        return {"base": "cannot_connect"}
+    return stations
 
 
-def clean_data(data: dict[str, Any]) -> None:
+async def _post(
+    session: aiohttp.ClientSession, endpoint: str, query: dict[str, Any]
+) -> Any:
+    """Post a query and return the decoded JSON response."""
+    try:
+        async with session.post(
+            endpoint, json=query, timeout=REQUEST_TIMEOUT
+        ) as response:
+            if response.status >= 500:
+                raise _TransientRequestError(
+                    f"{endpoint} returned HTTP {response.status}"
+                )
+            if response.status != 200:
+                raise GraphQLRequestError(f"{endpoint} returned HTTP {response.status}")
+            return await response.json()
+    except (aiohttp.ContentTypeError, ValueError) as err:
+        raise GraphQLRequestError(f"Invalid response from {endpoint}: {err!r}") from err
+    except (aiohttp.ClientError, TimeoutError) as err:
+        raise _TransientRequestError(f"Error requesting {endpoint}: {err!r}") from err
+
+
+def clean_data(stations: list[dict[str, Any]]) -> None:
     """Clean the rideable names by replacing Unicode characters."""
-    if "data" in data and "supply" in data["data"]:
-        for station in data["data"]["supply"].get("stations", []):
-            for ebike in station.get("ebikes", []):
-                if "rideableName" in ebike:
-                    ebike["rideableName"] = ebike["rideableName"].replace("\u00b7", ".")
-
-            for scooter in station.get("scooters", []):
-                if "rideableName" in scooter:
-                    scooter["rideableName"] = scooter["rideableName"].replace(
-                        "\u00b7", "."
-                    )
-    else:
-        _LOGGER.warning("Data format is unexpected, cannot clean the rideable names")
+    for station in stations:
+        for rideable in (station.get("ebikes") or []) + (station.get("scooters") or []):
+            if rideable and rideable.get("rideableName"):
+                rideable["rideableName"] = rideable["rideableName"].replace("·", ".")

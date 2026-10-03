@@ -4,32 +4,30 @@ import asyncio
 import logging
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import (
-    DOMAIN,
-    UPDATE_INTERVAL,
-    NetworkGraphQLEndpoints,
-    NetworkNames,
-    NetworkRegion,
-)
+from .const import DOMAIN, UPDATE_INTERVAL, Network
 from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
-from .graphql_requests import fetch_graphql_data
+from .graphql_requests import GraphQLRequestError, fetch_stations
 
 _LOGGER = logging.getLogger(__name__)
+
+type CitibikeConfigEntry = ConfigEntry[CitibikeCoordinator]
 
 
 class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     """Fetch all stations of one network, shared by every sensor on it."""
 
-    def __init__(self, hass: HomeAssistant, network: NetworkNames) -> None:
+    def __init__(self, hass: HomeAssistant, network: Network) -> None:
         """Initialize the coordinator."""
         super().__init__(
             hass,
             _LOGGER,
             config_entry=None,
-            name=f"{DOMAIN}_{network.name.lower()}",
+            name=f"{DOMAIN}_{network.key}",
             update_interval=UPDATE_INTERVAL,
         )
         self.network = network
@@ -42,11 +40,12 @@ class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 await self.async_refresh()
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
-        """Fetch the stations of every region, keyed by station name."""
-        network_name = self.network.name
+        """Fetch the stations of every region, keyed by station ID."""
+        network = self.network
+        session = async_get_clientsession(self.hass)
         stations: dict[str, dict[str, Any]] = {}
 
-        for region_code in NetworkRegion[network_name].value:
+        for region_code in network.regions:
             query = {
                 "query": GET_SUPPLY_QUERY,
                 "variables": {
@@ -54,28 +53,19 @@ class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 },
             }
 
-            data = await fetch_graphql_data(
-                NetworkGraphQLEndpoints[network_name], query
-            )
-
             # A partial result would make the missing region's stations look
             # removed, so fail the whole update instead.
-            if data.get("base") == "cannot_connect":
-                raise UpdateFailed(
-                    f"Connection failed for network {network_name} region {region_code}"
-                )
-
             try:
-                region_stations = data["data"]["supply"]["stations"]
-            except (KeyError, TypeError) as err:
+                region_stations = await fetch_stations(session, network.endpoint, query)
+            except GraphQLRequestError as err:
                 raise UpdateFailed(
-                    f"Unexpected response for network {network_name} region {region_code}"
+                    f"Fetch failed for network {network.name} region {region_code}: {err}"
                 ) from err
 
             for station in region_stations:
-                stations[station["stationName"]] = station
+                stations[station["stationId"]] = station
 
         if not stations:
-            raise UpdateFailed(f"No stations retrieved for network {network_name}")
+            raise UpdateFailed(f"No stations retrieved for network {network.name}")
 
         return stations

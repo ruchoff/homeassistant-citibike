@@ -1,25 +1,28 @@
 """Config flow for Citibike integration."""
 
-from datetime import timedelta
 import logging
-from typing import ClassVar
-
-from haversine import haversine
-import voluptuous as vol
+from typing import Any
 
 from homeassistant import config_entries
-from homeassistant.core import callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
+from homeassistant.util.location import distance
+import voluptuous as vol
 
-from .cache import StationCache
 from .const import (
-    CONF_STATIONID,
+    CONF_NETWORK,
+    CONF_STATION_ID,
+    CONF_STATION_NAME,
     DOMAIN,
-    NetworkGraphQLEndpoints,
-    NetworkNames,
-    NetworkRegion,
+    NETWORKS,
+    NETWORKS_BY_KEY,
 )
 from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
-from .graphql_requests import fetch_graphql_data
+from .graphql_requests import GraphQLRequestError, fetch_stations
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,160 +30,176 @@ _LOGGER = logging.getLogger(__name__)
 class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Citibike."""
 
-    # Class level cache configuration
-    _stations_cache: ClassVar[dict[str, StationCache]] = {}
-    STATION_CACHE_TIMEOUT: ClassVar[timedelta] = timedelta(hours=6)
+    VERSION = 1
+    MINOR_VERSION = 3
 
     def __init__(self) -> None:
         """Initialize the config flow."""
-        self._config: dict = {}
-        self._stations: list[dict[str, str]] = []
+        self._config: dict[str, Any] = {}
+        self._stations: list[dict[str, Any]] = []
+        self._station_choices: dict[str, dict[str, Any]] = {}
 
     async def async_step_user(
-        self, user_input: dict[str, any] | None = None
+        self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Handle the initial step to select a network."""
         _LOGGER.debug("Starting user step to select a network")
+        errors: dict[str, str] = {}
+
         if user_input is not None:
-            self._config["network"] = user_input["network"]
-            _LOGGER.debug("Network selected: %s", user_input["network"])
-            return await self.async_step_select_station()
+            self._config[CONF_NETWORK] = user_input[CONF_NETWORK]
+            _LOGGER.debug("Network selected: %s", user_input[CONF_NETWORK])
+
+            errors = await self._async_fetch_stations()
+            if not errors:
+                return await self.async_step_select_station()
 
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required("network"): vol.In(
-                        [network.value for network in NetworkNames]
+                    vol.Required(CONF_NETWORK): vol.In(
+                        {network.key: network.name for network in NETWORKS}
                     ),
-                }
-            ),
-        )
-
-    async def async_step_select_station(
-        self, user_input: dict[str, any] | None = None
-    ) -> config_entries.ConfigFlowResult:
-        """Handle the step to select a station within the selected network."""
-        _LOGGER.debug("Starting step to select a station")
-        errors = {}
-
-        if user_input is not None:
-            self._config[CONF_STATIONID] = user_input[CONF_STATIONID]
-            _LOGGER.debug("Station selected: %s", user_input[CONF_STATIONID])
-
-            # Check if the station ID is already configured
-            existing_entries = self._async_current_entries()
-            for entry in existing_entries:
-                if entry.data.get(CONF_STATIONID) == user_input[CONF_STATIONID]:
-                    errors["base"] = "already_configured"
-                    _LOGGER.debug(
-                        "Station ID %s is already configured",
-                        user_input[CONF_STATIONID],
-                    )
-                    break
-
-            # Set unique ID for the sensor name
-            await self.async_set_unique_id(
-                f"{self._config['network'].lower()}_{user_input[CONF_STATIONID].lower()}"
-            )
-            self._abort_if_unique_id_configured()
-
-            if not errors:
-                _LOGGER.debug(
-                    "Creating entry for network %s and station %s",
-                    self._config["network"],
-                    user_input[CONF_STATIONID],
-                )
-                return self.async_create_entry(
-                    title=f"{self._config['network']} {user_input[CONF_STATIONID]}",
-                    data=self._config,
-                )
-
-        # Fetch stations if not already fetched
-        if not self._stations:
-            errors = await self._async_fetch_stations()
-
-        if errors:
-            return self.async_show_form(
-                step_id="select_station",
-                data_schema=vol.Schema({}),
-                errors=errors,
-            )
-
-        # Get home zone coordinates
-        home_zone = self.hass.states.get("zone.home")
-        home_lat = home_zone.attributes["latitude"]
-        home_lon = home_zone.attributes["longitude"]
-
-        # Calculate distance to home zone and sort stations
-        for station in self._stations:
-            station_lat = station["location"]["lat"]
-            station_lon = station["location"]["lng"]
-            station["distance"] = haversine(
-                (home_lat, home_lon), (station_lat, station_lon)
-            )
-
-        self._stations.sort(key=lambda x: x["distance"])
-
-        # Create a dropdown list of stations
-        station_options = {
-            station["stationName"]: station["stationName"] for station in self._stations
-        }
-
-        return self.async_show_form(
-            step_id="select_station",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_STATIONID): vol.In(station_options),
                 }
             ),
             errors=errors,
         )
 
-    @staticmethod
-    @callback
-    def async_get_options_flow(config_entry):
-        """Get the options flow for this handler."""
-        return CitibikeOptionsFlowHandler(config_entry)
+    async def async_step_select_station(
+        self, user_input: dict[str, Any] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """Handle the step to select a station within the selected network."""
+        _LOGGER.debug("Starting step to select a station")
+        errors: dict[str, str] = {}
+
+        if user_input is not None and (
+            station := self._find_station(user_input[CONF_STATION_ID])
+        ):
+            station_id = station["stationId"]
+            station_name = station["stationName"]
+            self._config[CONF_STATION_ID] = station_id
+            self._config[CONF_STATION_NAME] = station_name
+            _LOGGER.debug("Station selected: %s (%s)", station_name, station_id)
+
+            network = NETWORKS_BY_KEY[self._config[CONF_NETWORK]]
+            await self.async_set_unique_id(f"{network.key}_{station_id}")
+            self._abort_if_unique_id_configured()
+
+            _LOGGER.debug(
+                "Creating entry for network %s and station %s",
+                network.name,
+                station_name,
+            )
+            return self.async_create_entry(
+                title=f"{network.name} {station_name}",
+                data=self._config,
+            )
+
+        if user_input is not None:
+            errors[CONF_STATION_ID] = "invalid_station"
+
+        # Sort stations by distance to home
+        home_lat = self.hass.config.latitude
+        home_lon = self.hass.config.longitude
+        self._stations.sort(
+            key=lambda station: distance(
+                home_lat,
+                home_lon,
+                station["location"]["lat"],
+                station["location"]["lng"],
+            )
+        )
+
+        # Create a dropdown of station names in order of distance. The frontend
+        # only offers type-to-search on a dropdown that accepts custom values,
+        # and then shows the option value in the box, so the names themselves
+        # are the values and are mapped back to stations in _find_station.
+        self._station_choices = {}
+        for station in self._stations:
+            label = name = station["stationName"]
+            count = 1
+            while label in self._station_choices:
+                count += 1
+                label = f"{name} ({count})"
+            self._station_choices[label] = station
+
+        return self.async_show_form(
+            step_id="select_station",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_STATION_ID): SelectSelector(
+                        SelectSelectorConfig(
+                            options=list(self._station_choices),
+                            mode=SelectSelectorMode.DROPDOWN,
+                            custom_value=True,
+                        )
+                    ),
+                }
+            ),
+            errors=errors,
+        )
+
+    def _find_station(self, value: str) -> dict[str, Any] | None:
+        """Return the station picked from the list or typed by name."""
+        if station := self._station_choices.get(value):
+            return station
+
+        # Typed text is only accepted when it names exactly one station
+        name = value.strip().casefold()
+        matches = [
+            station
+            for label, station in self._station_choices.items()
+            if label.casefold() == name
+        ]
+        return matches[0] if len(matches) == 1 else None
 
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
-        network = NetworkNames(self._config.get("network"))
+        network = NETWORKS_BY_KEY[self._config[CONF_NETWORK]]
         network_name = network.name
 
-        # Check station cache
-        if cached_data := StationCache.get_cached_data(network_name):
-            self._stations = cached_data
+        # A network that is already set up has an up to date station list
+        coordinator = self.hass.data.get(DOMAIN, {}).get(network.key)
+        if coordinator is not None and coordinator.last_update_success:
+            self._stations = list(coordinator.data.values())
             return {}
 
         _LOGGER.debug("[API] Fetching station list for network %s", network_name)
 
-        region_codes = NetworkRegion[network_name].value
-        all_stations: list[dict] = []
+        region_codes = network.regions
+        session = async_get_clientsession(self.hass)
+        all_stations: list[dict[str, Any]] = []
 
         for region_code in region_codes:
+            # Without a rideable page limit the API takes several times longer
+            # and often times out; the station list needs no rideables
             query = {
                 "query": GET_INIT_STATION_QUERY,
-                "variables": {"input": {"regionCode": region_code}},
+                "variables": {
+                    "input": {"regionCode": region_code, "rideablePageLimit": 1}
+                },
             }
 
-            data = await fetch_graphql_data(
-                NetworkGraphQLEndpoints[network_name], query
-            )
-
-            if data.get("base") == "cannot_connect":
+            # Don't offer a list that is missing a region
+            try:
+                stations = await fetch_stations(session, network.endpoint, query)
+            except GraphQLRequestError as err:
                 _LOGGER.warning(
-                    "[API] Connection failed for network %s region %s",
+                    "[API] Fetch failed for network %s region %s: %s",
                     network_name,
                     region_code,
+                    err,
                 )
-                continue
+                return {"base": "cannot_connect"}
 
-            stations = data["data"]["supply"]["stations"]
             all_stations.extend(stations)
 
+        if not all_stations:
+            _LOGGER.warning("[API] No stations retrieved for network %s", network_name)
+            return {"base": "cannot_connect"}
+
         self._stations = all_stations
-        StationCache.update_cache(network_name, self._stations)
 
         _LOGGER.debug(
             "[Config] Found %d stations for network %s",
@@ -189,18 +208,3 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         return {}
-
-
-class CitibikeOptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle Citibike options."""
-
-    def __init__(self, config_entry) -> None:
-        """Initialize the options flow handler."""
-        self.config_entry = config_entry
-
-    async def async_step_init(self, user_input=None):
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(step_id="init")

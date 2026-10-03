@@ -1,15 +1,14 @@
-name: Validate with hassfest
+name: Lint
 
 on:
   push:
     branches: ["main"]
   pull_request:
-  schedule:
-    - cron: "0 0 * * *"
 
 jobs:
-  validate:
+  ruff:
     runs-on: "ubuntu-latest"
     steps:
       - uses: "actions/checkout@v4"
-      - uses: home-assistant/actions/hassfest@master
+      - uses: "astral-sh/ruff-action@v3"
+      - run: ruff format --check
