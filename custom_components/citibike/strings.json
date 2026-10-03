@@ -25,5 +25,21 @@
 				"description": "Select the bike share station you want to track."
 			}
 		}
+	},
+	"entity": {
+		"sensor": {
+			"docks_available": {
+				"name": "Docks available"
+			},
+			"bikes_available": {
+				"name": "Classic bikes available"
+			},
+			"ebikes_available": {
+				"name": "E-bikes available"
+			},
+			"max_ebike_distance": {
+				"name": "Max e-bike range"
+			}
+		}
 	}
 }
