@@ -28,7 +28,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Citibike from a config entry."""
-    network = NETWORKS_BY_NAME[entry.data[CONF_NETWORK]]
+    if (network := NETWORKS_BY_NAME.get(entry.data[CONF_NETWORK])) is None:
+        raise ConfigEntryError(
+            f"The {entry.data[CONF_NETWORK]} network is no longer supported; "
+            "remove this station"
+        )
 
     # One coordinator per network, shared by all of its stations
     coordinators = hass.data.setdefault(DOMAIN, {})

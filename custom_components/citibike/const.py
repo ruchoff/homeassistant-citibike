@@ -44,12 +44,6 @@ NETWORKS: tuple[Network, ...] = (
         regions=("CHI",),
     ),
     Network(
-        key="cogo",
-        name="CoGo",
-        endpoint="https://cogobikeshare.com/bikesharefe-gql",
-        regions=("CMH",),
-    ),
-    Network(
         key="capitalbikeshare",
         name="Capital Bikeshare",
         endpoint="https://capitalbikeshare.com/bikesharefe-gql",

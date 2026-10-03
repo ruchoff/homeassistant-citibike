@@ -6,14 +6,13 @@
 [![license][license-badge]][license-url]
 
 
-This integration provides real-time data about bike share stations across multiple city networks within Home Assistant. It allows you to track bike availability, docking spaces, and station status for a variety of bike share programs, including Citi Bike, Bay Wheels, Divvy, CoGo, Capital Bikeshare, and BIKETOWN. By fetching information from each city's official GraphQL feed, it helps you stay up to date with the availability of bikes in real-time.
+This integration provides real-time data about bike share stations across multiple city networks within Home Assistant. It allows you to track bike availability, docking spaces, and station status for a variety of bike share programs, including Citi Bike, Bay Wheels, Divvy, Capital Bikeshare, and BIKETOWN. By fetching information from each city's official GraphQL feed, it helps you stay up to date with the availability of bikes in real-time.
 
 ## Supported Networks:
 - [**Bay Wheels**][baywheels-home] - _Bay Area_
 - [**BIKETOWN**][biketown-home] - _Portland_
 - [**Capital Bikeshare**][capitalbikeshare-home] - _Metro DC_
 - [**Citi Bike**][citibike-home] - _New York_
-- [**CoGo**][cogo-home] - _Columbus_
 - [**Divvy**][divvy-home] - _Chicago_
 
 
@@ -42,7 +41,7 @@ This integration provides real-time data about bike share stations across multip
 
 1. In Home Assistant, navigate to **Settings** > **Devices & Services**.
 2. Click **Add Integration** and search for "Citi Bike".
-3. Select the **Network** you want to track (e.g., Citibike, Bay Wheels, Divvy, CoGo, Capital Bikeshare, or BIKETOWN).
+3. Select the **Network** you want to track (e.g., Citibike, Bay Wheels, Divvy, Capital Bikeshare, or BIKETOWN).
 4. After selecting the network, a dropdown will appear with a list of stations within that network. Choose the station you want to monitor.
 
 Repeat these steps for each station you want to track. Each station is added as a device.
@@ -90,7 +89,6 @@ This integration uses data from each network's system, which is provided via eac
 - [**BIKETOWN**][biketown-gql]
 - [**Capital Bikeshare**][capitalbikeshare-gql]
 - [**Citi Bike**][citibike-gql]
-- [**CoGo**][cogo-gql]
 - [**Divvy**][divvy-gql]
 
 ### Data License Agreements
@@ -98,7 +96,6 @@ This integration uses data from each network's system, which is provided via eac
 - [**BIKETOWN**][biketown-data-license]
 - [**Capital Bikeshare**][capitalbikeshare-data-license]
 - [**Citi Bike**][citibike-data-license]
-- [**CoGo**][cogo-data-license]
 - [**Divvy**][divvy-data-license]
 
 
@@ -117,7 +114,6 @@ This integration uses data from each network's system, which is provided via eac
 [biketown-home]: https://biketownpdx.com/
 [capitalbikeshare-home]: https://capitalbikeshare.com/
 [citibike-home]: https://citibikenyc.com/
-[cogo-home]: https://cogobikeshare.com/
 [divvy-home]: https://divvybikes.com/
 
 
@@ -126,14 +122,12 @@ This integration uses data from each network's system, which is provided via eac
 [biketown-data-license]: https://biketownpdx.com/system-data
 [capitalbikeshare-data-license]: https://capitalbikeshare.com/data-license-agreement
 [citibike-data-license]: https://ride.citibikenyc.com/data-sharing-policy
-[cogo-data-license]: https://cogobikeshare.com/data-license-agreement
 [divvy-data-license]: https://divvybikes.com/data-license-agreement
 
 [baywheels-gql]: https://account.baywheels.com/bikesharefe-gql
 [biketown-gql]: https://biketownpdx.com/bikesharefe-gql
 [capitalbikeshare-gql]: https://capitalbikeshare.com/bikesharefe-gql
 [citibike-gql]: https://account.citibikenyc.com/bikesharefe-gql
-[cogo-gql]: https://cogobikeshare.com/bikesharefe-gql
 [divvy-gql]: https://divvybikes.com/bikesharefe-gql
 
 [hacs]: https://hacs.xyz

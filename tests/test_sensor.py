@@ -247,3 +247,17 @@ async def test_station_value_sensors(
     mock_fetch.side_effect = GraphQLRequestError("boom")
     await tick(hass)
     assert hass.states.get(f"{ENTITY_ID}_docks_available").state == "unavailable"
+
+
+async def test_removed_network(hass: HomeAssistant, mock_fetch) -> None:
+    """An entry for a network that was removed fails setup with an error."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={"network": "CoGo", "station_id": "1", "station_name": "High St"},
+        unique_id="cogo_1",
+        minor_version=2,
+    )
+    await setup_entry(hass, entry)
+
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert mock_fetch.call_count == 0
