@@ -27,6 +27,11 @@ async def test_full_flow(hass: HomeAssistant, mock_fetch) -> None:
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "select_station"
+    # The station list is requested without rideables, which is much faster
+    query = mock_fetch.call_args.args[2]
+    assert query["variables"] == {
+        "input": {"regionCode": "BKN", "rideablePageLimit": 1}
+    }
     # Closest station to home is offered first
     options = result["data_schema"].schema["station_id"].config["options"]
     assert options == ["W 21 St & 6 Ave", "E 40 St & Park Ave"]

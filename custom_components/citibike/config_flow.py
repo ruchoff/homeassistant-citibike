@@ -172,9 +172,13 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         all_stations: list[dict[str, Any]] = []
 
         for region_code in region_codes:
+            # Without a rideable page limit the API takes several times longer
+            # and often times out; the station list needs no rideables
             query = {
                 "query": GET_INIT_STATION_QUERY,
-                "variables": {"input": {"regionCode": region_code}},
+                "variables": {
+                    "input": {"regionCode": region_code, "rideablePageLimit": 1}
+                },
             }
 
             # Don't offer a list that is missing a region
