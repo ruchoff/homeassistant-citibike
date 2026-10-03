@@ -313,3 +313,66 @@ async def test_migrate_network_name(hass: HomeAssistant, mock_fetch) -> None:
     assert entry.minor_version == 3
     assert entry.data["network"] == "citibike"
     assert hass.states.get(ENTITY_ID).attributes["network"] == "Citibike"
+
+
+async def test_malformed_ebikes(hass: HomeAssistant, mock_fetch) -> None:
+    """E-bikes with missing battery data do not break the station's sensors."""
+    hass.config.units = US_CUSTOMARY_SYSTEM
+    ebikes = [
+        {"rideableName": "111", "batteryStatus": None},
+        {"rideableName": "222", "batteryStatus": {"percent": 50}},
+        {
+            "rideableName": None,
+            "batteryStatus": {"percent": 80, "distanceRemaining": None},
+        },
+        None,
+        {
+            "rideableName": "333",
+            "batteryStatus": {
+                "percent": 60,
+                "distanceRemaining": {"value": 20, "unit": "miles"},
+            },
+        },
+    ]
+    mock_fetch.return_value = [
+        make_station("E 40 St & Park Ave", "motivate_BKN_1", 0, 0, ebikes=ebikes)
+    ]
+    await setup_entry(hass, make_entry())
+
+    state = hass.states.get(ENTITY_ID)
+    assert state.state == "7"
+    assert state.attributes["max_ebike_distance"] == 20
+    assert state.attributes["ebike_status"] == [
+        {
+            "bike_id": "111",
+            "battery_percent": None,
+            "distance_remaining": None,
+            "distance_remaining_units": None,
+        },
+        {
+            "bike_id": "222",
+            "battery_percent": 50,
+            "distance_remaining": None,
+            "distance_remaining_units": None,
+        },
+        {
+            "bike_id": None,
+            "battery_percent": 80,
+            "distance_remaining": None,
+            "distance_remaining_units": None,
+        },
+        {
+            "bike_id": "333",
+            "battery_percent": 60,
+            "distance_remaining": 20,
+            "distance_remaining_units": "miles",
+        },
+    ]
+    assert hass.states.get(f"{ENTITY_ID}_max_e_bike_range").state == "20"
+
+    mock_fetch.return_value = [
+        make_station("E 40 St & Park Ave", "motivate_BKN_1", 0, 0, ebikes=None)
+    ]
+    await tick(hass)
+    assert hass.states.get(ENTITY_ID).attributes["ebike_status"] == []
+    assert hass.states.get(f"{ENTITY_ID}_max_e_bike_range").state == "0"

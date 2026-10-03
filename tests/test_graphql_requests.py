@@ -23,6 +23,9 @@ async def test_fetch_stations(
     """Stations are returned with cleaned rideable names."""
     station = make_station("E 40 St & Park Ave", "motivate_BKN_1", 0, 0)
     station["ebikes"][0]["rideableName"] = "123\u00b74567"
+    station["ebikes"][1]["rideableName"] = None
+    station["ebikes"].append(None)
+    station["scooters"] = None
     aioclient_mock.post(ENDPOINT, json=supply_response([station]))
 
     stations = await fetch_stations(async_get_clientsession(hass), ENDPOINT, {})

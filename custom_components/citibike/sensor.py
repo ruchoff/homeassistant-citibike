@@ -23,12 +23,36 @@ from .coordinator import CitibikeCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 
+def _ebike_status(station: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the status of the station's e-bikes.
+
+    The API can leave out a bike's battery or range, which is reported as None
+    rather than failing the whole station.
+    """
+    status = []
+    for ebike in station.get("ebikes") or []:
+        if not ebike:
+            continue
+        battery = ebike.get("batteryStatus") or {}
+        distance = battery.get("distanceRemaining") or {}
+        status.append(
+            {
+                "bike_id": ebike.get("rideableName"),
+                "battery_percent": battery.get("percent"),
+                "distance_remaining": distance.get("value"),
+                "distance_remaining_units": distance.get("unit"),
+            }
+        )
+    return status
+
+
 def _max_ebike_distance(station: dict[str, Any]) -> float:
     """Return the longest remaining range of the station's e-bikes."""
     return max(
         (
-            ebike["batteryStatus"]["distanceRemaining"]["value"]
-            for ebike in station["ebikes"]
+            ebike["distance_remaining"]
+            for ebike in _ebike_status(station)
+            if ebike["distance_remaining"] is not None
         ),
         default=0,
     )
@@ -153,19 +177,7 @@ class CitibikeSensor(CitibikeStationEntity):
         if (station := self._station) is None:
             return None
 
-        ebike_status = [
-            {
-                "bike_id": ebike["rideableName"],
-                "battery_percent": ebike["batteryStatus"]["percent"],
-                "distance_remaining": ebike["batteryStatus"]["distanceRemaining"][
-                    "value"
-                ],
-                "distance_remaining_units": ebike["batteryStatus"]["distanceRemaining"][
-                    "unit"
-                ],
-            }
-            for ebike in station["ebikes"]
-        ]
+        ebike_status = _ebike_status(station)
 
         return {
             "station_id": station["siteId"],
@@ -181,7 +193,14 @@ class CitibikeSensor(CitibikeStationEntity):
                 "Human Powered": station["bikesAvailable"],
                 "Electric Powered": station["ebikesAvailable"],
             },
-            "max_ebike_distance": _max_ebike_distance(station),
+            "max_ebike_distance": max(
+                (
+                    ebike["distance_remaining"]
+                    for ebike in ebike_status
+                    if ebike["distance_remaining"] is not None
+                ),
+                default=0,
+            ),
             "ebike_status": ebike_status,
             "last_reported": dt_util.utc_from_timestamp(
                 station["lastUpdatedMs"] / 1000

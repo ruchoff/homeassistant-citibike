@@ -52,10 +52,6 @@ async def fetch_stations(
 def clean_data(stations: list[dict[str, Any]]) -> None:
     """Clean the rideable names by replacing Unicode characters."""
     for station in stations:
-        for ebike in station.get("ebikes", []):
-            if "rideableName" in ebike:
-                ebike["rideableName"] = ebike["rideableName"].replace("·", ".")
-
-        for scooter in station.get("scooters", []):
-            if "rideableName" in scooter:
-                scooter["rideableName"] = scooter["rideableName"].replace("·", ".")
+        for rideable in (station.get("ebikes") or []) + (station.get("scooters") or []):
+            if rideable and rideable.get("rideableName"):
+                rideable["rideableName"] = rideable["rideableName"].replace("·", ".")
