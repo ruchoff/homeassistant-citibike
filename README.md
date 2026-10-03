@@ -33,8 +33,9 @@ This integration provides real-time data about bike share stations across multip
 
 ### Manual Installation
 
-1. Download the `citibike` folder from this repository.
-2. Copy the `citibike` folder into your `custom_components` directory in Home Assistant.
+1. Download `citibike.zip` from the [latest release][release-url].
+2. Extract it into a `citibike` folder inside your `custom_components` directory in Home Assistant.
+3. Restart Home Assistant.
 
 
 ### Configuration

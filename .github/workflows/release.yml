@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  release:
+    types: ["published"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+      - name: Set the manifest version from the release tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          manifest="custom_components/citibike/manifest.json"
+          jq --indent 4 --arg version "$version" '.version = $version' "$manifest" > "$RUNNER_TEMP/manifest.json"
+          mv "$RUNNER_TEMP/manifest.json" "$manifest"
+      - name: Build the release archive
+        run: |
+          cd custom_components/citibike
+          zip -r "$RUNNER_TEMP/citibike.zip" . -x "*__pycache__*"
+      - name: Upload the archive to the release
+        run: gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/citibike.zip" --clobber
+        env:
+          GH_TOKEN: "${{ github.token }}"
