@@ -8,6 +8,7 @@ from haversine import haversine
 import voluptuous as vol
 
 from homeassistant import config_entries
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .cache import StationCache
 from .const import (
@@ -19,7 +20,7 @@ from .const import (
     NetworkRegion,
 )
 from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
-from .graphql_requests import fetch_graphql_data
+from .graphql_requests import GraphQLRequestError, fetch_stations
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -133,6 +134,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         _LOGGER.debug("[API] Fetching station list for network %s", network_name)
 
         region_codes = NetworkRegion[network_name].value
+        session = async_get_clientsession(self.hass)
         all_stations: list[dict] = []
 
         for region_code in region_codes:
@@ -141,26 +143,17 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "variables": {"input": {"regionCode": region_code}},
             }
 
-            data = await fetch_graphql_data(
-                NetworkGraphQLEndpoints[network_name], query
-            )
-
             # Don't offer (or cache) a list that is missing a region
-            if data.get("base") == "cannot_connect":
-                _LOGGER.warning(
-                    "[API] Connection failed for network %s region %s",
-                    network_name,
-                    region_code,
-                )
-                return {"base": "cannot_connect"}
-
             try:
-                stations = data["data"]["supply"]["stations"]
-            except (KeyError, TypeError):
+                stations = await fetch_stations(
+                    session, NetworkGraphQLEndpoints[network_name], query
+                )
+            except GraphQLRequestError as err:
                 _LOGGER.warning(
-                    "[API] Unexpected response for network %s region %s",
+                    "[API] Fetch failed for network %s region %s: %s",
                     network_name,
                     region_code,
+                    err,
                 )
                 return {"base": "cannot_connect"}
 

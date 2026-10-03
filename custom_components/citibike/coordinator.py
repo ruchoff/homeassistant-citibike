@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -15,7 +16,7 @@ from .const import (
     NetworkRegion,
 )
 from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
-from .graphql_requests import fetch_graphql_data
+from .graphql_requests import GraphQLRequestError, fetch_stations
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         """Fetch the stations of every region, keyed by station ID."""
         network_name = self.network.name
+        session = async_get_clientsession(self.hass)
         stations: dict[str, dict[str, Any]] = {}
 
         for region_code in NetworkRegion[network_name].value:
@@ -54,22 +56,15 @@ class CitibikeCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
                 },
             }
 
-            data = await fetch_graphql_data(
-                NetworkGraphQLEndpoints[network_name], query
-            )
-
             # A partial result would make the missing region's stations look
             # removed, so fail the whole update instead.
-            if data.get("base") == "cannot_connect":
-                raise UpdateFailed(
-                    f"Connection failed for network {network_name} region {region_code}"
-                )
-
             try:
-                region_stations = data["data"]["supply"]["stations"]
-            except (KeyError, TypeError) as err:
+                region_stations = await fetch_stations(
+                    session, NetworkGraphQLEndpoints[network_name], query
+                )
+            except GraphQLRequestError as err:
                 raise UpdateFailed(
-                    f"Unexpected response for network {network_name} region {region_code}"
+                    f"Fetch failed for network {network_name} region {region_code}: {err}"
                 ) from err
 
             for station in region_stations:
