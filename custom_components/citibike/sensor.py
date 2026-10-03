@@ -1,28 +1,16 @@
 """Integration for Citibike sensors."""
 
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
-
-import voluptuous as vol
+from typing import Any
 
 from homeassistant import config_entries, core
-from homeassistant.components.sensor import PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .cache import SensorDataCache
-from .const import CONF_STATIONID, NetworkGraphQLEndpoints, NetworkNames, NetworkRegion
-from .graphql_queries.get_supply_query import GET_SUPPLY_QUERY
-from .graphql_requests import fetch_graphql_data
+from .const import CONF_STATIONID
+from .coordinator import CitibikeCoordinator
 
 _LOGGER = logging.getLogger(__name__)
-SCAN_INTERVAL = timedelta(minutes=5)
-
-SENSOR_PLATFORM_SCHEMA = SENSOR_PLATFORM_SCHEMA.extend(
-    {
-        vol.Required(CONF_STATIONID): cv.string,
-    }
-)
 
 
 async def async_setup_entry(
@@ -30,54 +18,28 @@ async def async_setup_entry(
 ) -> None:
     """Set up the Citibike sensors from a config entry."""
     _LOGGER.debug("Setting up Citibike sensor entry")
-    data = GQLServiceData(entry.data)
-    await data.update()
-    sensor = CitibikeSensor(entry.data, data)
-    async_add_entities([sensor], True)
+    async_add_entities([CitibikeSensor(entry.runtime_data, entry.data)])
 
 
-def setup_platform(
-    hass: core.HomeAssistant,
-    config: config_entries.ConfigEntry,
-    add_devices,
-    discovery_info=None,
-) -> None:
-    """Set up the Citibike sensors."""
-    _LOGGER.debug("Setting up Citibike sensor platform")
-    data = GQLServiceData(config)
-    data.update()
-    sensor = CitibikeSensor(config, data)
-    add_devices([sensor], True)
-
-
-class CitibikeSensor(Entity):
+class CitibikeSensor(CoordinatorEntity[CitibikeCoordinator]):
     """Sensor that reads the status for a Citibike station."""
 
-    def __init__(self, config: dict, data: "GQLServiceData") -> None:
+    def __init__(self, coordinator: CitibikeCoordinator, config: dict) -> None:
         """Initialize the sensor."""
+        super().__init__(coordinator)
         self._id = config[CONF_STATIONID]
-        self._data = data
-        self._state = 0
+        self._network = coordinator.network.value
+        self._name = f"{self._network}_{self._id}"
 
-        network = NetworkNames(config["network"]).value
-        station_name = f"{network}_{self._id}"
-        self._name = station_name
-        self._network = network
-        self._site_id = None
+    @property
+    def _station(self) -> dict[str, Any] | None:
+        """Return the latest data for this station, if the network reports it."""
+        return self.coordinator.data.get(self._id)
 
-        self._latitude = None
-        self._longitude = None
-        self._capacity = 0
-        self._region = None
-
-        self._last_reported = None
-        self._docks_available = 0
-        self._num_bikes_available = 0
-        self._num_ebikes_available = 0
-        self._is_offline = False
-        self._total_rideables_available = 0
-        self._ebike_status = []
-        self._max_ebike_distance = 0
+    @property
+    def available(self) -> bool:
+        """Return if the last update succeeded and included this station."""
+        return super().available and self._station is not None
 
     @property
     def name(self) -> str:
@@ -85,9 +47,11 @@ class CitibikeSensor(Entity):
         return self._name
 
     @property
-    def state(self) -> int:
+    def state(self) -> int | None:
         """Return the state of the sensor."""
-        return self._total_rideables_available
+        if (station := self._station) is None:
+            return None
+        return station["totalRideablesAvailable"]
 
     @property
     def unique_id(self) -> str:
@@ -110,44 +74,12 @@ class CitibikeSensor(Entity):
         return "mdi:bicycle"
 
     @property
-    def extra_state_attributes(self) -> dict:
+    def extra_state_attributes(self) -> dict | None:
         """Return the attributes of the sensor."""
-        return {
-            "station_id": self._site_id,
-            "station_name": self._id,
-            "network": self._network,
-            "latitude": self._latitude,
-            "longitude": self._longitude,
-            "total_rideables_available": self._total_rideables_available,
-            "station_capacity": self._capacity,
-            "docks_available": self._docks_available,
-            "available_bike_types": {
-                "Human Powered": self._num_bikes_available,
-                "Electric Powered": self._num_ebikes_available,
-            },
-            "max_ebike_distance": self._max_ebike_distance,
-            "ebike_status": self._ebike_status,
-            "last_reported": self._last_reported,
-            "is_offline": self._is_offline,
-        }
+        if (station := self._station) is None:
+            return None
 
-    async def async_update(self) -> None:
-        """Update the sensor."""
-        _LOGGER.debug("Updating Citibike sensor %s", self._id)
-        await self._data.update()
-        station = self._data.station_data
-        self._site_id = station["siteId"]
-        self._latitude = station["location"]["lat"]
-        self._longitude = station["location"]["lng"]
-        self._capacity = station["totalBikesAvailable"] + station["bikeDocksAvailable"]
-        self._last_reported = datetime.fromtimestamp(station["lastUpdatedMs"] / 1000)
-        self._docks_available = station["bikeDocksAvailable"]
-        self._num_bikes_available = station["bikesAvailable"]
-        self._num_ebikes_available = station["ebikesAvailable"]
-        self._is_offline = station["isOffline"]
-        self._total_rideables_available = station["totalRideablesAvailable"]
-
-        self._ebike_status = [
+        ebike_status = [
             {
                 "bike_id": ebike["rideableName"],
                 "battery_percent": ebike["batteryStatus"]["percent"],
@@ -160,81 +92,26 @@ class CitibikeSensor(Entity):
             }
             for ebike in station["ebikes"]
         ]
-        self._max_ebike_distance = max(
-            (
-                ebike["batteryStatus"]["distanceRemaining"]["value"]
-                for ebike in station["ebikes"]
+
+        return {
+            "station_id": station["siteId"],
+            "station_name": self._id,
+            "network": self._network,
+            "latitude": station["location"]["lat"],
+            "longitude": station["location"]["lng"],
+            "total_rideables_available": station["totalRideablesAvailable"],
+            "station_capacity": station["totalBikesAvailable"]
+            + station["bikeDocksAvailable"],
+            "docks_available": station["bikeDocksAvailable"],
+            "available_bike_types": {
+                "Human Powered": station["bikesAvailable"],
+                "Electric Powered": station["ebikesAvailable"],
+            },
+            "max_ebike_distance": max(
+                (ebike["distance_remaining"] for ebike in ebike_status),
+                default=0,
             ),
-            default=0,
-        )
-
-        self._state = station["totalRideablesAvailable"]
-
-
-class GQLServiceData:
-    """Query GQL API for Citibike data."""
-
-    def __init__(self, config: dict) -> None:
-        """Initialize the GQL Service Data."""
-        self._config = config
-        self.station_data = None
-        self._network = NetworkNames(self._config.get("network"))
-
-    async def update(self) -> None:
-        """Update data based on SCAN_INTERVAL."""
-        network_name = self._network.name
-
-        # Check sensor data cache
-        if cached_data := SensorDataCache.get_cached_data(network_name):
-            self._update_station_data(cached_data)
-            return
-
-        _LOGGER.debug("[API] Fetching data for network %s", network_name)
-
-        region_codes = NetworkRegion[network_name].value
-        all_stations: list[dict] = []
-
-        for region_code in region_codes:
-            query = {
-                "query": GET_SUPPLY_QUERY,
-                "variables": {
-                    "input": {"regionCode": region_code, "rideablePageLimit": 1000}
-                },
-            }
-
-            data = await fetch_graphql_data(
-                NetworkGraphQLEndpoints[network_name], query
-            )
-
-            if data.get("base") == "cannot_connect":
-                _LOGGER.warning(
-                    "[API] Connection failed for network %s region %s",
-                    network_name,
-                    region_code,
-                )
-                continue
-
-            stations = data["data"]["supply"]["stations"]
-            all_stations.extend(stations)
-
-        if not all_stations:
-            _LOGGER.warning("[API] No stations retrieved for network %s", network_name)
-            return
-
-        SensorDataCache.update_cache(network_name, all_stations)
-        self._update_station_data(all_stations)
-
-    def _update_station_data(self, stations: list[dict[str, any]]) -> None:
-        """Update station data from stations list."""
-        station_name = self._config[CONF_STATIONID]
-        if station := next(
-            (s for s in stations if s["stationName"] == station_name),
-            None,
-        ):
-            self.station_data = station
-            _LOGGER.debug(
-                "[Station] Updated %s - Bikes: %d, E-bikes: %d",
-                station_name,
-                station["bikesAvailable"],
-                station["ebikesAvailable"],
-            )
+            "ebike_status": ebike_status,
+            "last_reported": datetime.fromtimestamp(station["lastUpdatedMs"] / 1000),
+            "is_offline": station["isOffline"],
+        }

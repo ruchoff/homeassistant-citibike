@@ -1,10 +1,13 @@
 """Constants for the Citibike integration."""
 
+from datetime import timedelta
 from enum import Enum
 
 DOMAIN = "citibike"
 
 CONF_STATIONID = "id"
+
+UPDATE_INTERVAL = timedelta(minutes=5)
 
 
 class NetworkNames(Enum):
