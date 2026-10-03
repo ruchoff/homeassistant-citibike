@@ -4,11 +4,11 @@ from datetime import timedelta
 import logging
 from typing import ClassVar
 
-from haversine import haversine
 import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util.location import distance
 
 from .cache import StationCache
 from .const import (
@@ -99,11 +99,12 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
         # Calculate distance to home and sort stations
-        home = (self.hass.config.latitude, self.hass.config.longitude)
+        home_lat = self.hass.config.latitude
+        home_lon = self.hass.config.longitude
         for station in self._stations:
             station_lat = station["location"]["lat"]
             station_lon = station["location"]["lng"]
-            station["distance"] = haversine(home, (station_lat, station_lon))
+            station["distance"] = distance(home_lat, home_lon, station_lat, station_lon)
 
         self._stations.sort(key=lambda x: x["distance"])
 

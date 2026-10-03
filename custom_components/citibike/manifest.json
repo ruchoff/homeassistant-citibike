@@ -7,6 +7,6 @@
 	"documentation": "https://github.com/ruchoff/homeassistant-citibike",
 	"iot_class": "cloud_polling",
 	"issue_tracker": "https://github.com/ruchoff/homeassistant-citibike/issues",
-	"requirements": ["haversine"],
+	"requirements": [],
 	"version": "v2.0.0"
 }
