@@ -22,7 +22,9 @@ ENTITY_ID = "sensor.citibike_e_40_st_park_ave"
 
 
 def make_entry(
-    station_id: str = "motivate_BKN_1", station_name: str = "E 40 St & Park Ave"
+    station_id: str = "motivate_BKN_1",
+    station_name: str = "E 40 St & Park Ave",
+    title: str | None = None,
 ) -> MockConfigEntry:
     """Build a config entry for a station."""
     return MockConfigEntry(
@@ -34,6 +36,7 @@ def make_entry(
         },
         unique_id=f"citibike_{station_id}",
         minor_version=3,
+        title=title or f"Citibike {station_name}",
     )
 
 
@@ -147,9 +150,12 @@ async def test_setup_retry_and_unload(hass: HomeAssistant, mock_fetch) -> None:
     assert hass.data[DOMAIN] == {}
 
 
-async def test_station_rename(hass: HomeAssistant, mock_fetch) -> None:
-    """A renamed station keeps working because it is tracked by ID."""
-    await setup_entry(hass, make_entry())
+async def test_station_rename(
+    hass: HomeAssistant, device_registry: dr.DeviceRegistry, mock_fetch
+) -> None:
+    """A renamed station keeps working and its entry and device are renamed."""
+    entry = make_entry()
+    await setup_entry(hass, entry)
 
     mock_fetch.return_value = [
         make_station("Park Ave & E 40 St", "motivate_BKN_1", 0, 0)
@@ -159,6 +165,31 @@ async def test_station_rename(hass: HomeAssistant, mock_fetch) -> None:
     state = hass.states.get(ENTITY_ID)
     assert state.state == "7"
     assert state.attributes["station_name"] == "Park Ave & E 40 St"
+    assert state.attributes["friendly_name"] == "Citibike Park Ave & E 40 St"
+    assert (
+        hass.states.get(f"{ENTITY_ID}_docks_available").attributes["friendly_name"]
+        == "Citibike Park Ave & E 40 St Docks available"
+    )
+
+    assert entry.title == "Citibike Park Ave & E 40 St"
+    assert entry.data["station_name"] == "Park Ave & E 40 St"
+    assert entry.state is ConfigEntryState.LOADED
+    (device,) = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
+    assert device.name == "Citibike Park Ave & E 40 St"
+
+
+async def test_station_rename_while_stopped(
+    hass: HomeAssistant, device_registry: dr.DeviceRegistry, mock_fetch
+) -> None:
+    """A rename that happened while Home Assistant was down is picked up."""
+    entry = make_entry(station_name="Old Name", title="My bike station")
+    await setup_entry(hass, entry)
+
+    assert entry.data["station_name"] == "E 40 St & Park Ave"
+    # A title the user changed is kept
+    assert entry.title == "My bike station"
+    (device,) = dr.async_entries_for_config_entry(device_registry, entry.entry_id)
+    assert device.name == "Citibike E 40 St & Park Ave"
 
 
 def make_legacy_entry() -> MockConfigEntry:
