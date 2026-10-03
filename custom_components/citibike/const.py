@@ -1,10 +1,11 @@
 """Constants for the Citibike integration."""
 
+from dataclasses import dataclass
 from datetime import timedelta
-from enum import Enum
 
 DOMAIN = "citibike"
 
+CONF_NETWORK = "network"
 CONF_STATION_ID = "station_id"
 CONF_STATION_NAME = "station_name"
 # Entries created before station IDs were stored only hold the station name
@@ -13,28 +14,54 @@ CONF_LEGACY_STATION_NAME = "id"
 UPDATE_INTERVAL = timedelta(minutes=5)
 
 
-class NetworkNames(Enum):
-    CITIBIKE = "Citibike"
-    BAYWHEELS = "Bay Wheels"
-    DIVVY = "Divvy"
-    COGO = "CoGo"
-    CAPITALBIKESHARE = "Capital Bikeshare"
-    BIKETOWN = "BIKETOWN"
+@dataclass(frozen=True)
+class Network:
+    """A bike share network served by a Lyft GraphQL endpoint."""
+
+    key: str
+    name: str
+    endpoint: str
+    regions: tuple[str, ...]
 
 
-class NetworkGraphQLEndpoints(Enum):
-    CITIBIKE = "https://account.citibikenyc.com/bikesharefe-gql"
-    BAYWHEELS = "https://account.baywheels.com/bikesharefe-gql"
-    DIVVY = "https://divvybikes.com/bikesharefe-gql"
-    COGO = "https://cogobikeshare.com/bikesharefe-gql"
-    CAPITALBIKESHARE = "https://capitalbikeshare.com/bikesharefe-gql"
-    BIKETOWN = "https://biketownpdx.com/bikesharefe-gql"
+NETWORKS: tuple[Network, ...] = (
+    Network(
+        key="citibike",
+        name="Citibike",
+        endpoint="https://account.citibikenyc.com/bikesharefe-gql",
+        regions=("BKN",),
+    ),
+    Network(
+        key="baywheels",
+        name="Bay Wheels",
+        endpoint="https://account.baywheels.com/bikesharefe-gql",
+        regions=("SFO", "SJC"),
+    ),
+    Network(
+        key="divvy",
+        name="Divvy",
+        endpoint="https://divvybikes.com/bikesharefe-gql",
+        regions=("CHI",),
+    ),
+    Network(
+        key="cogo",
+        name="CoGo",
+        endpoint="https://cogobikeshare.com/bikesharefe-gql",
+        regions=("CMH",),
+    ),
+    Network(
+        key="capitalbikeshare",
+        name="Capital Bikeshare",
+        endpoint="https://capitalbikeshare.com/bikesharefe-gql",
+        regions=("DCA",),
+    ),
+    Network(
+        key="biketown",
+        name="BIKETOWN",
+        endpoint="https://biketownpdx.com/bikesharefe-gql",
+        regions=("PDX",),
+    ),
+)
 
-
-class NetworkRegion(Enum):
-    CITIBIKE = ["BKN"]
-    BAYWHEELS = ["SFO", "SJC"]
-    DIVVY = ["CHI"]
-    COGO = ["CMH"]
-    CAPITALBIKESHARE = ["DCA"]
-    BIKETOWN = ["PDX"]
+# Config entries store the network by its display name
+NETWORKS_BY_NAME: dict[str, Network] = {network.name: network for network in NETWORKS}

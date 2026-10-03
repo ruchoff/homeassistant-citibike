@@ -104,8 +104,8 @@ class CitibikeStationEntity(CoordinatorEntity[CitibikeCoordinator], SensorEntity
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._id = config[CONF_STATION_ID]
-        self._network = coordinator.network.value
-        self._station_unique_id = f"{coordinator.network.name.lower()}_{self._id}"
+        self._network = coordinator.network.name
+        self._station_unique_id = f"{coordinator.network.key}_{self._id}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, self._station_unique_id)},
             name=f"{self._network} {config[CONF_STATION_NAME]}",

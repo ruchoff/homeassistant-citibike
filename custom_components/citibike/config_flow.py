@@ -1,8 +1,7 @@
 """Config flow for Citibike integration."""
 
-from datetime import timedelta
 import logging
-from typing import ClassVar
+from typing import Any
 
 import voluptuous as vol
 
@@ -12,12 +11,12 @@ from homeassistant.util.location import distance
 
 from .cache import StationCache
 from .const import (
+    CONF_NETWORK,
     CONF_STATION_ID,
     CONF_STATION_NAME,
     DOMAIN,
-    NetworkGraphQLEndpoints,
-    NetworkNames,
-    NetworkRegion,
+    NETWORKS,
+    NETWORKS_BY_NAME,
 )
 from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
 from .graphql_requests import GraphQLRequestError, fetch_stations
@@ -31,25 +30,21 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
     MINOR_VERSION = 2
 
-    # Class level cache configuration
-    _stations_cache: ClassVar[dict[str, StationCache]] = {}
-    STATION_CACHE_TIMEOUT: ClassVar[timedelta] = timedelta(hours=6)
-
     def __init__(self) -> None:
         """Initialize the config flow."""
         self._config: dict = {}
         self._stations: list[dict[str, str]] = []
 
     async def async_step_user(
-        self, user_input: dict[str, any] | None = None
+        self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Handle the initial step to select a network."""
         _LOGGER.debug("Starting user step to select a network")
         errors = {}
 
         if user_input is not None:
-            self._config["network"] = user_input["network"]
-            _LOGGER.debug("Network selected: %s", user_input["network"])
+            self._config[CONF_NETWORK] = user_input[CONF_NETWORK]
+            _LOGGER.debug("Network selected: %s", user_input[CONF_NETWORK])
 
             errors = await self._async_fetch_stations()
             if not errors:
@@ -59,8 +54,8 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required("network"): vol.In(
-                        [network.value for network in NetworkNames]
+                    vol.Required(CONF_NETWORK): vol.In(
+                        [network.name for network in NETWORKS]
                     ),
                 }
             ),
@@ -68,7 +63,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_select_station(
-        self, user_input: dict[str, any] | None = None
+        self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """Handle the step to select a station within the selected network."""
         _LOGGER.debug("Starting step to select a station")
@@ -84,17 +79,17 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._config[CONF_STATION_NAME] = station_name
             _LOGGER.debug("Station selected: %s (%s)", station_name, station_id)
 
-            network = NetworkNames(self._config["network"])
-            await self.async_set_unique_id(f"{network.name.lower()}_{station_id}")
+            network = NETWORKS_BY_NAME[self._config[CONF_NETWORK]]
+            await self.async_set_unique_id(f"{network.key}_{station_id}")
             self._abort_if_unique_id_configured()
 
             _LOGGER.debug(
                 "Creating entry for network %s and station %s",
-                self._config["network"],
+                network.name,
                 station_name,
             )
             return self.async_create_entry(
-                title=f"{self._config['network']} {station_name}",
+                title=f"{network.name} {station_name}",
                 data=self._config,
             )
 
@@ -124,17 +119,17 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
-        network = NetworkNames(self._config.get("network"))
+        network = NETWORKS_BY_NAME[self._config[CONF_NETWORK]]
         network_name = network.name
 
         # Check station cache
-        if cached_data := StationCache.get_cached_data(network_name):
+        if cached_data := StationCache.get_cached_data(network.key):
             self._stations = cached_data
             return {}
 
         _LOGGER.debug("[API] Fetching station list for network %s", network_name)
 
-        region_codes = NetworkRegion[network_name].value
+        region_codes = network.regions
         session = async_get_clientsession(self.hass)
         all_stations: list[dict] = []
 
@@ -146,9 +141,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             # Don't offer (or cache) a list that is missing a region
             try:
-                stations = await fetch_stations(
-                    session, NetworkGraphQLEndpoints[network_name], query
-                )
+                stations = await fetch_stations(session, network.endpoint, query)
             except GraphQLRequestError as err:
                 _LOGGER.warning(
                     "[API] Fetch failed for network %s region %s: %s",
@@ -165,7 +158,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return {"base": "cannot_connect"}
 
         self._stations = all_stations
-        StationCache.update_cache(network_name, self._stations)
+        StationCache.update_cache(network.key, self._stations)
 
         _LOGGER.debug(
             "[Config] Found %d stations for network %s",

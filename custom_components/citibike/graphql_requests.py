@@ -3,8 +3,6 @@ from typing import Any
 
 import aiohttp
 
-from .const import NetworkGraphQLEndpoints
-
 _LOGGER = logging.getLogger(__name__)
 
 # Default headers
@@ -19,7 +17,7 @@ class GraphQLRequestError(Exception):
 
 async def fetch_stations(
     session: aiohttp.ClientSession,
-    endpoint: NetworkGraphQLEndpoints,
+    endpoint: str,
     query: dict[str, Any],
     headers: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
@@ -30,24 +28,18 @@ async def fetch_stations(
 
     try:
         async with session.post(
-            endpoint.value, json=query, headers=headers, timeout=REQUEST_TIMEOUT
+            endpoint, json=query, headers=headers, timeout=REQUEST_TIMEOUT
         ) as response:
             if response.status != 200:
-                raise GraphQLRequestError(
-                    f"{endpoint.value} returned HTTP {response.status}"
-                )
+                raise GraphQLRequestError(f"{endpoint} returned HTTP {response.status}")
             data = await response.json()
     except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-        raise GraphQLRequestError(
-            f"Error requesting {endpoint.value}: {err!r}"
-        ) from err
+        raise GraphQLRequestError(f"Error requesting {endpoint}: {err!r}") from err
 
     try:
         stations = data["data"]["supply"]["stations"]
     except (KeyError, TypeError) as err:
-        raise GraphQLRequestError(
-            f"Unexpected response from {endpoint.value}"
-        ) from err
+        raise GraphQLRequestError(f"Unexpected response from {endpoint}") from err
 
     _LOGGER.debug("Successfully fetched data from GraphQL API")
     clean_data(stations)

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
-from typing import ClassVar
+from typing import Any, ClassVar
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class CacheData:
     """Class to hold cache data."""
 
     timestamp: datetime
-    data: list[dict[str, any]]
+    data: list[dict[str, Any]]
 
 
 class StationCache:
@@ -23,7 +23,7 @@ class StationCache:
     TIMEOUT: ClassVar[timedelta] = timedelta(hours=6)
 
     @classmethod
-    def get_cached_data(cls, network_name: str) -> list[dict[str, any]] | None:
+    def get_cached_data(cls, network_name: str) -> list[dict[str, Any]] | None:
         """Get cached station data if valid."""
         if (
             network_name in cls._cache
@@ -40,7 +40,7 @@ class StationCache:
         return None
 
     @classmethod
-    def update_cache(cls, network_name: str, data: list[dict[str, any]]) -> None:
+    def update_cache(cls, network_name: str, data: list[dict[str, Any]]) -> None:
         """Update station cache with new data."""
         cls._cache[network_name] = CacheData(
             timestamp=datetime.now(),
