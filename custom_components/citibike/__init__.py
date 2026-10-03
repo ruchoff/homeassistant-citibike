@@ -12,7 +12,9 @@ from .const import (
     CONF_STATION_ID,
     CONF_STATION_NAME,
     DOMAIN,
-    NETWORKS_BY_NAME,
+    LEGACY_NETWORK_KEYS,
+    NETWORKS_BY_KEY,
+    Network,
 )
 from .coordinator import CitibikeCoordinator
 
@@ -28,11 +30,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Citibike from a config entry."""
-    if (network := NETWORKS_BY_NAME.get(entry.data[CONF_NETWORK])) is None:
-        raise ConfigEntryError(
-            f"The {entry.data[CONF_NETWORK]} network is no longer supported; "
-            "remove this station"
-        )
+    network = _async_get_network(hass, entry)
 
     # One coordinator per network, shared by all of its stations
     coordinators = hass.data.setdefault(DOMAIN, {})
@@ -49,6 +47,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+def _async_get_network(hass: HomeAssistant, entry: ConfigEntry) -> Network:
+    """Return the entry's network, migrating a network stored by display name."""
+    value = entry.data[CONF_NETWORK]
+    if (network := NETWORKS_BY_KEY.get(value)) is not None:
+        return network
+
+    if (key := LEGACY_NETWORK_KEYS.get(value)) is None:
+        raise ConfigEntryError(
+            f"The {value} network is no longer supported; remove this station"
+        )
+
+    # An entry that also lacks a station ID gets its version from that migration
+    hass.config_entries.async_update_entry(
+        entry,
+        data={**entry.data, CONF_NETWORK: key},
+        minor_version=3 if CONF_STATION_ID in entry.data else entry.minor_version,
+    )
+    return NETWORKS_BY_KEY[key]
 
 
 def _async_migrate_station_name(
@@ -83,7 +101,7 @@ def _async_migrate_station_name(
             CONF_STATION_NAME: station_name,
         },
         unique_id=unique_id,
-        minor_version=2,
+        minor_version=3,
     )
 
 
@@ -97,7 +115,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not any(
             other.entry_id != entry.entry_id
             and other.state is ConfigEntryState.LOADED
-            and other.data[CONF_NETWORK] == network.name
+            and other.data[CONF_NETWORK] == network.key
             for other in hass.config_entries.async_entries(DOMAIN)
         ):
             hass.data[DOMAIN].pop(network.key, None)

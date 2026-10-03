@@ -57,5 +57,13 @@ NETWORKS: tuple[Network, ...] = (
     ),
 )
 
-# Config entries store the network by its display name
-NETWORKS_BY_NAME: dict[str, Network] = {network.name: network for network in NETWORKS}
+NETWORKS_BY_KEY: dict[str, Network] = {network.key: network for network in NETWORKS}
+
+# Entries used to store the network by the display name it had at the time
+LEGACY_NETWORK_KEYS: dict[str, str] = {
+    "Citibike": "citibike",
+    "Bay Wheels": "baywheels",
+    "Divvy": "divvy",
+    "Capital Bikeshare": "capitalbikeshare",
+    "BIKETOWN": "biketown",
+}

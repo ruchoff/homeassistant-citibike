@@ -23,7 +23,7 @@ async def test_full_flow(hass: HomeAssistant, mock_fetch) -> None:
     assert result["step_id"] == "user"
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Citibike"}
+        result["flow_id"], {"network": "citibike"}
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "select_station"
@@ -38,7 +38,7 @@ async def test_full_flow(hass: HomeAssistant, mock_fetch) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "Citibike E 40 St & Park Ave"
     assert result["data"] == {
-        "network": "Citibike",
+        "network": "citibike",
         "station_id": "motivate_BKN_1",
         "station_name": "E 40 St & Park Ave",
     }
@@ -53,7 +53,7 @@ async def test_no_home_zone(hass: HomeAssistant, mock_fetch) -> None:
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Citibike"}
+        result["flow_id"], {"network": "citibike"}
     )
     assert result["step_id"] == "select_station"
 
@@ -66,7 +66,7 @@ async def test_cannot_connect_then_recover(hass: HomeAssistant, mock_fetch) -> N
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Citibike"}
+        result["flow_id"], {"network": "citibike"}
     )
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
@@ -75,7 +75,7 @@ async def test_cannot_connect_then_recover(hass: HomeAssistant, mock_fetch) -> N
     mock_fetch.side_effect = None
     mock_fetch.return_value = STATIONS
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Citibike"}
+        result["flow_id"], {"network": "citibike"}
     )
     assert result["step_id"] == "select_station"
 
@@ -95,12 +95,12 @@ async def test_partial_region_failure_is_not_cached(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Bay Wheels"}
+        result["flow_id"], {"network": "baywheels"}
     )
     assert result["errors"] == {"base": "cannot_connect"}
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Bay Wheels"}
+        result["flow_id"], {"network": "baywheels"}
     )
     assert result["step_id"] == "select_station"
     assert len(result["data_schema"].schema["station_id"].config["options"]) == 2
@@ -113,7 +113,7 @@ async def test_already_configured(hass: HomeAssistant, mock_fetch) -> None:
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"network": "Citibike"}
+            result["flow_id"], {"network": "citibike"}
         )
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"station_id": "E 40 St & Park Ave"}
@@ -128,7 +128,7 @@ async def test_same_station_name_on_another_network(
     hass: HomeAssistant, mock_fetch
 ) -> None:
     """A station name shared by two networks can be added on both."""
-    for network in ("Citibike", "Divvy"):
+    for network in ("citibike", "divvy"):
         result = await hass.config_entries.flow.async_init(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
@@ -160,7 +160,7 @@ async def test_duplicate_station_names(hass: HomeAssistant, mock_fetch) -> None:
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"network": "Citibike"}
+            result["flow_id"], {"network": "citibike"}
         )
         options = result["data_schema"].schema["station_id"].config["options"]
         assert options == list(choices)
@@ -179,7 +179,7 @@ async def test_typed_station(hass: HomeAssistant, mock_fetch) -> None:
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Citibike"}
+        result["flow_id"], {"network": "citibike"}
     )
     assert result["data_schema"].schema["station_id"].config["custom_value"]
 
@@ -209,7 +209,7 @@ async def test_station_list_is_fetched_per_flow(
             DOMAIN, context={"source": config_entries.SOURCE_USER}
         )
         result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], {"network": "Citibike"}
+            result["flow_id"], {"network": "citibike"}
         )
         options = result["data_schema"].schema["station_id"].config["options"]
         assert len(options) == len(stations)
@@ -222,12 +222,12 @@ async def test_station_list_from_loaded_network(
     entry = MockConfigEntry(
         domain=DOMAIN,
         data={
-            "network": "Citibike",
+            "network": "citibike",
             "station_id": "motivate_BKN_1",
             "station_name": "E 40 St & Park Ave",
         },
         unique_id="citibike_motivate_BKN_1",
-        minor_version=2,
+        minor_version=3,
     )
     entry.add_to_hass(hass)
     await hass.config_entries.async_setup(entry.entry_id)
@@ -238,7 +238,7 @@ async def test_station_list_from_loaded_network(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"network": "Citibike"}
+        result["flow_id"], {"network": "citibike"}
     )
     assert result["step_id"] == "select_station"
     assert len(result["data_schema"].schema["station_id"].config["options"]) == 2

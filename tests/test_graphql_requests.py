@@ -6,7 +6,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import pytest
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
-from custom_components.citibike.const import NETWORKS_BY_NAME
+from custom_components.citibike.const import NETWORKS_BY_KEY
 from custom_components.citibike.graphql_requests import (
     GraphQLRequestError,
     fetch_stations,
@@ -14,7 +14,7 @@ from custom_components.citibike.graphql_requests import (
 
 from .conftest import make_station, supply_response
 
-ENDPOINT = NETWORKS_BY_NAME["Citibike"].endpoint
+ENDPOINT = NETWORKS_BY_KEY["citibike"].endpoint
 
 
 async def test_fetch_stations(

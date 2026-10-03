@@ -19,7 +19,7 @@ from .const import (
     CONF_STATION_NAME,
     DOMAIN,
     NETWORKS,
-    NETWORKS_BY_NAME,
+    NETWORKS_BY_KEY,
 )
 from .graphql_queries.get_init_station_query import GET_INIT_STATION_QUERY
 from .graphql_requests import GraphQLRequestError, fetch_stations
@@ -31,7 +31,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Citibike."""
 
     VERSION = 1
-    MINOR_VERSION = 2
+    MINOR_VERSION = 3
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -59,7 +59,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_NETWORK): vol.In(
-                        [network.name for network in NETWORKS]
+                        {network.key: network.name for network in NETWORKS}
                     ),
                 }
             ),
@@ -82,7 +82,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             self._config[CONF_STATION_NAME] = station_name
             _LOGGER.debug("Station selected: %s (%s)", station_name, station_id)
 
-            network = NETWORKS_BY_NAME[self._config[CONF_NETWORK]]
+            network = NETWORKS_BY_KEY[self._config[CONF_NETWORK]]
             await self.async_set_unique_id(f"{network.key}_{station_id}")
             self._abort_if_unique_id_configured()
 
@@ -156,7 +156,7 @@ class CitibikeConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def _async_fetch_stations(self) -> dict[str, str]:
         """Fetch stations from the Citibike GraphQL API asynchronously."""
-        network = NETWORKS_BY_NAME[self._config[CONF_NETWORK]]
+        network = NETWORKS_BY_KEY[self._config[CONF_NETWORK]]
         network_name = network.name
 
         # A network that is already set up has an up to date station list

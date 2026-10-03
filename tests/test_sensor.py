@@ -28,12 +28,12 @@ def make_entry(
     return MockConfigEntry(
         domain=DOMAIN,
         data={
-            "network": "Citibike",
+            "network": "citibike",
             "station_id": station_id,
             "station_name": station_name,
         },
         unique_id=f"citibike_{station_id}",
-        minor_version=2,
+        minor_version=3,
     )
 
 
@@ -188,10 +188,10 @@ async def test_migrate_station_name(
     await hass.async_block_till_done()
 
     assert entry.state is ConfigEntryState.LOADED
-    assert entry.minor_version == 2
+    assert entry.minor_version == 3
     assert entry.unique_id == "citibike_motivate_BKN_1"
     assert entry.data == {
-        "network": "Citibike",
+        "network": "citibike",
         "station_id": "motivate_BKN_1",
         "station_name": "E 40 St & Park Ave",
     }
@@ -207,14 +207,15 @@ async def test_migrate_station_name(
 
 
 async def test_migrate_missing_station(hass: HomeAssistant, mock_fetch) -> None:
-    """An entry whose station name no longer exists fails setup untouched."""
+    """An entry whose station name no longer exists fails setup unmigrated."""
     mock_fetch.side_effect = None
     mock_fetch.return_value = STATIONS[1:]
     entry = make_legacy_entry()
     await setup_entry(hass, entry)
 
     assert entry.state is ConfigEntryState.SETUP_ERROR
-    assert entry.data == {"network": "Citibike", "id": "E 40 St & Park Ave"}
+    assert entry.data == {"network": "citibike", "id": "E 40 St & Park Ave"}
+    assert entry.minor_version == 1
 
 
 async def test_station_value_sensors(
@@ -255,9 +256,29 @@ async def test_removed_network(hass: HomeAssistant, mock_fetch) -> None:
         domain=DOMAIN,
         data={"network": "CoGo", "station_id": "1", "station_name": "High St"},
         unique_id="cogo_1",
-        minor_version=2,
+        minor_version=3,
     )
     await setup_entry(hass, entry)
 
     assert entry.state is ConfigEntryState.SETUP_ERROR
     assert mock_fetch.call_count == 0
+
+
+async def test_migrate_network_name(hass: HomeAssistant, mock_fetch) -> None:
+    """An entry that stored the network's display name is migrated to its key."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "network": "Citibike",
+            "station_id": "motivate_BKN_1",
+            "station_name": "E 40 St & Park Ave",
+        },
+        unique_id="citibike_motivate_BKN_1",
+        minor_version=2,
+    )
+    await setup_entry(hass, entry)
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.minor_version == 3
+    assert entry.data["network"] == "citibike"
+    assert hass.states.get(ENTITY_ID).attributes["network"] == "Citibike"
